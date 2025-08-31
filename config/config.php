@@ -2,13 +2,13 @@
 // تنظیمات اصلی سیستم
 define('APP_NAME', 'سیستم مدیریت ارتباط با مشتری');
 define('APP_VERSION', '1.0.0');
-define('BASE_URL', 'http://localhost/1/');
+define('BASE_URL', 'https://office.see-co.ir/');
 
 // تنظیمات دیتابیس
 define('DB_HOST', 'localhost');
-define('DB_NAME', 'crm_system');
-define('DB_USER', 'root');
-define('DB_PASS', '');
+define('DB_NAME', 'readyser_crm');
+define('DB_USER', 'readyser_crm');
+define('DB_PASS', 'BXG7KJY8az^ltF=T');
 define('DB_CHARSET', 'utf8mb4');
 define('DB_SOCKET', '/Applications/XAMPP/xamppfiles/var/mysql/mysql.sock');
 

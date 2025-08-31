@@ -14,22 +14,22 @@ if (isLoggedIn()) {
 $error = '';
 $success = '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
-    $username   = sanitizeInput($_POST['username']);
-    $password   = $_POST['password'];
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $username   = trim(sanitizeInput($_POST['username'] ?? ''));
+    $password   = $_POST['password'] ?? '';
     $csrf_token = $_POST['csrf_token'] ?? '';
 
     if (!verifyCSRFToken($csrf_token)) {
         $error = 'درخواست نامعتبر. لطفاً مجدداً تلاش کنید.';
-    } elseif (empty($username) || empty($password)) {
+    } elseif ($username === '' || $password === '') {
         $error = 'لطفاً تمام فیلدها را پر کنید';
     } else {
         $result = loginUser($username, $password);
-        if ($result['success']) {
+        if (!empty($result['success'])) {
             header('Location: dashboard.php');
             exit();
         } else {
-            $error = $result['message'];
+            $error = $result['message'] ?? 'خطای ورود';
         }
     }
 }
@@ -70,14 +70,17 @@ $csrf_token = generateCSRFToken();
 }
 
 html,body{height:100%}
+*{box-sizing:border-box}
 body{
   font-family:'Vazirmatn',sans-serif;
   background:
     radial-gradient(1100px 800px at 10% -10%,rgba(0,176,164,.30) 0,rgba(0,176,164,.06) 45%,transparent 60%),
     linear-gradient(135deg,#00b0a4 0%, #f3f7f8 100%);
+  min-height:100vh;
+  margin:0;          /* فضای اضافی حذف شد */
+  padding:0;         /* فضای اضافی حذف شد */
   display:flex;align-items:center;justify-content:center;
   color:var(--text);
-  padding:16px;
 }
 
 .login-container{
@@ -87,6 +90,7 @@ body{
   overflow:hidden;
   max-width:1000px;width:100%;
   border:1px solid rgba(0,176,164,.08);
+  margin:0; /* بدون حاشیهٔ زائد */
 }
 
 .login-image{
@@ -122,9 +126,7 @@ body{
 .alert-success{background:#ecfdf5;color:#10b981;border-left:5px solid #10b981}
 
 /* ===== Float Fields (Glass) ===== */
-.float-field{
-  position:relative;margin-bottom:16px;
-}
+.float-field{position:relative;margin-bottom:16px}
 .float-control{
   width:100%;
   background:rgba(255,255,255,.55);
@@ -330,7 +332,7 @@ pass?.addEventListener('keyup', (e)=>{
   pass.toggleAttribute('data-caps', !!isCaps);
 });
 
-// Submit loading state
+// Submit loading state (مانع ارسال فرم نمی‌شود)
 form?.addEventListener('submit', ()=>{
   submitBtn.disabled = true;
   submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin ms-1"></i> در حال ورود…';

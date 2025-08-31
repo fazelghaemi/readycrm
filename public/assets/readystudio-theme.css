@@ -1,0 +1,18 @@
+/* public/assets/readystudio-theme.css */
+:root{
+  --rs-primary:#00b0a4;
+  --rs-primary-dark:#098b82;
+  --rs-midnight:#181c24;
+  --rs-bg:#f6f9fa;
+  --rs-text:#1b1f2b;
+}
+body{background:var(--rs-bg);color:var(--rs-text)}
+a,.link-primary{color:var(--rs-primary)!important}
+.btn-primary,.btn-success{
+  background:linear-gradient(90deg,var(--rs-primary),var(--rs-primary-dark))!important;
+  border-color:var(--rs-primary)!important;
+}
+.navbar,.sidebar{background:var(--rs-midnight)!important}
+.table thead th{background:#eef5f5}
+.badge-primary{background:var(--rs-primary)!important}
+.alert-primary{background:#e6fbf9;border-color:#ccf7f2;color:#0f3f3a}
