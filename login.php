@@ -116,6 +116,22 @@ body{
   transition:transform .08s ease, box-shadow .2s;
   color:#fff;text-decoration:none;font-weight:700;
 }
+/* ستون‌ها را هم‌قد کن و پنل راست را تا ته بکش */
+.login-container .row{ align-items: stretch; }         /* بوت‌استرپ flex هست؛ این میگه ارتفاع ستون‌ها برابر باشه */
+.col-lg-6.d-none.d-lg-block{ display:flex; }           /* ستون راست فلکس بشه تا فرزندش قد بگیره */
+.login-image{ height:100%; }                            /* خود پنل گرادیانی تا کف ستون پر بشه */
+
+/* اختیاری برای ستون فرم تا ارتفاع کامل بگیره */
+.col-12.col-lg-6{ display:flex; }
+.login-form{ flex:1; }
+
+.btn-otp{
+  display:inline-block; background:linear-gradient(90deg,#00b0a4,#098b82);
+  color:#fff; padding:10px 14px; border-radius:10px; text-decoration:none; font-weight:700;
+}
+.btn-otp:hover{ filter:saturate(1.05); }
+
+
 .brand-chip:hover{transform:translateY(-1px);box-shadow:0 8px 20px rgba(0,0,0,.12)}
 
 .login-form{padding:64px 44px}
@@ -280,6 +296,10 @@ body{
               <button type="button" id="togglePass" class="toggle-pass" aria-label="نمایش/پنهان کردن رمز">
                 <i class="fa-solid fa-eye"></i>
               </button>
+            </div>
+
+            <div style="margin-top:12px">
+              <a href="/msgway_otp_module/login_with_otp.php" class="btn-otp">ورود با کد تایید (راه‌پیام)</a>
             </div>
 
             <div class="mb-3">
