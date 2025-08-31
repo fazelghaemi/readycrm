@@ -9,6 +9,12 @@ $current_user = getCurrentUser();
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
+    <!-- Favicon -->
+<link rel="icon" type="image/png" href="/favicon.png?v=1">
+<link rel="shortcut icon" type="image/png" href="/favicon.png?v=1">
+<link rel="apple-touch-icon" href="/favicon.png?v=1">
+<meta name="theme-color" content="#00b0a4">
+
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo isset($page_title) ? $page_title . ' - ' : ''; ?><?php echo APP_NAME; ?></title>
@@ -19,36 +25,48 @@ $current_user = getCurrentUser();
 
     <link href="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.css" rel="stylesheet">
     <style>
-        :root {
-            --primary-color: #ff6b35;
-            --primary-dark: #e55a2b;
-            --primary-light: #ff8660;
-            --primary-ultralight: #fff2ef;
-            --secondary-color: #ffffff;
-            --text-dark: #1a1a1a;
-            --text-medium: #4a4a4a;
-            --text-light: #6b7280;
-            --text-muted: #9ca3af;
-            --border-color: #e5e7eb;
-            --bg-light: #fafafa;
-            --bg-card: #ffffff;
-            --bg-sidebar: linear-gradient(145deg, #ff6b35, #e55a2b);
-            --success-color: #10b981;
-            --success-light: #ecfdf5;
-            --warning-color: #f59e0b;
-            --warning-light: #fffbeb;
-            --danger-color: #ef4444;
-            --danger-light: #fef2f2;
-            --info-color: #3b82f6;
-            --info-light: #eff6ff;
-            --dark-color: #374151;
-            --dark-light: #f3f4f6;
-            --shadow: 0 4px 20px rgba(255, 107, 53, 0.08);
-            --shadow-hover: 0 8px 30px rgba(255, 107, 53, 0.12);
-            --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.1);
-            --border-radius: 12px;
-            --border-radius-sm: 8px;
-            --transition: background-color 0.2s ease;
+         :root {
+          /* Brand core */
+          --primary-color: #00b0a4;         /* Ready Studio Teal */
+          --primary-dark: #098b82;          /* Deeper Teal */
+          --primary-light: #33c6ba;         /* Teal +20% light */
+          --primary-ultralight: #e9fbf9;    /* Very light Teal tint */
+        
+          /* Neutrals & text */
+          --secondary-color: #ffffff;
+          --text-dark: #1b1f2b;             /* brand_text_color */
+          --text-medium: #334155;
+          --text-light: #6b7280;
+          --text-muted: #94a3b8;
+        
+          /* Surfaces */
+          --border-color: #e5e7eb;
+          --bg-light: #f6f9fa;              /* brand_bg_color */
+          --bg-card: #ffffff;
+          --bg-sidebar: linear-gradient(160deg, #00b0a4 0%, #098b82 60%, #07756e 100%);
+        
+          /* Semantic */
+          --success-color: #10b981;
+          --success-light: #ecfdf5;
+          --warning-color: #f59e0b;
+          --warning-light: #fffbeb;
+          --danger-color: #ef4444;
+          --danger-light: #fef2f2;
+          --info-color: #3b82f6;
+          --info-light: #eff6ff;
+        
+          /* Dark accents */
+          --dark-color: #181c24;            /* brand_midnight_color */
+          --dark-light: #f3f4f6;
+        
+          /* Elevation & motion */
+          --shadow: 0 4px 20px rgba(0, 176, 164, 0.08);
+          --shadow-hover: 0 8px 30px rgba(0, 176, 164, 0.12);
+          --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08);
+        
+          --border-radius: 12px;
+          --border-radius-sm: 8px;
+          --transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
         }
 
         * {
