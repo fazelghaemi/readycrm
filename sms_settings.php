@@ -1,94 +1,193 @@
-
 <?php
-// شروع سشن برای مدیریت پیام‌ها
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
+/**
+ * sms_settings.php (v2)
+ * Full settings for MSGway (RahPayam) OTP:
+ *   - msgway_api_key (string)
+ *   - msgway_template_code (int)
+ *   - msgway_lineNumber (string, optional)
+ *   - msgway_mobile_format (enum: auto, +98, 09)
+ *   - msgway_resend_time (int seconds)
+ *   - msgway_otp_length (int 4..8)
+ * Backward-compatibility mirrors: rahpayam_api_key, rahpayam_pattern_code
+ */
+
+@session_start();
+
+$projectRootFiles = [
+    __DIR__ . '/config/config.php',
+    __DIR__ . '/config/database.php',
+    __DIR__ . '/includes/functions.php',
+    __DIR__ . '/includes/auth.php',
+];
+foreach ($projectRootFiles as $file) { if (file_exists($file)) require_once $file; }
+
+function ss_h($str) { return htmlspecialchars((string)$str, ENT_QUOTES, 'UTF-8'); }
+function ss_csrf_token() { if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token'] = bin2hex(random_bytes(32)); return $_SESSION['csrf_token']; }
+function ss_verify_csrf($token) { return isset($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], (string)$token); }
+
+function ss_get_pdo() {
+    if (class_exists('Database')) {
+        try {
+            $db = new Database();
+            if (method_exists($db, 'getConnection')) return $db->getConnection();
+            if (property_exists($db, 'pdo')) return $db->pdo;
+        } catch (Throwable $e) { error_log('Database init error: '.$e->getMessage()); }
+    }
+    $host = defined('DB_HOST') ? DB_HOST : getenv('DB_HOST');
+    $name = defined('DB_NAME') ? DB_NAME : getenv('DB_NAME');
+    $user = defined('DB_USER') ? DB_USER : getenv('DB_USER');
+    $pass = defined('DB_PASS') ? DB_PASS : getenv('DB_PASS');
+    $charset = 'utf8mb4';
+    if ($host && $name && $user !== false && $pass !== false) {
+        $dsn = "mysql:host={$host};dbname={$name};charset={$charset}";
+        $opts = [PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC, PDO::ATTR_EMULATE_PREPARES=>false];
+        try { return new PDO($dsn, (string)$user, (string)$pass, $opts); } catch (Throwable $e) { error_log('PDO fallback error: '.$e->getMessage()); }
+    }
+    return null;
 }
 
-// 1. اتصال به دیتابیس
-// فرض می‌کنیم شما یک فایل برای اتصال به دیتابیس دارید.
-// این فایل را با آدرس صحیح فایل اتصال خودتان جایگزین کنید.
-require_once('config/database.php'); // <--- !!! این خط را ویرایش کنید
+function ss_get_setting($pdo, $key, $table = 'settings') {
+    $sql = "SELECT setting_value FROM {$table} WHERE setting_key = :k LIMIT 1";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([':k' => $key]);
+    $row = $stmt->fetch();
+    return $row ? (string)$row['setting_value'] : '';
+}
 
-$message = '';
-
-// 2. بررسی اینکه آیا فرم ذخیره‌سازی ارسال شده است
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
-    // دریافت مقادیر از فرم
-    $apiKey = trim($_POST['rahpayam_api_key']);
-    $patternCode = trim($_POST['rahpayam_pattern_code']);
-
-    try {
-        // کوئری آپدیت برای کلید API
-        $stmt = $pdo->prepare("UPDATE settings SET setting_value = :value WHERE setting_key = 'rahpayam_api_key'");
-        $stmt->execute(['value' => $apiKey]);
-
-        // کوئری آپدیت برای کد الگو
-        $stmt = $pdo->prepare("UPDATE settings SET setting_value = :value WHERE setting_key = 'rahpayam_pattern_code'");
-        $stmt->execute(['value' => $patternCode]);
-        
-        // اگر رکوردی وجود نداشت، آن را ایجاد کن (برای نصب اولیه)
-        if ($stmt->rowCount() == 0) {
-            $pdo->prepare("INSERT INTO settings (setting_key, setting_value) VALUES ('rahpayam_api_key', ?), ('rahpayam_pattern_code', ?)")
-                ->execute([$apiKey, $patternCode]);
-        }
-
-
-        $message = '<div style="color: green; border: 1px solid green; padding: 10px; margin-bottom: 20px;">تنظیمات با موفقیت ذخیره شد.</div>';
-
-    } catch (PDOException $e) {
-        $message = '<div style="color: red; border: 1px solid red; padding: 10px; margin-bottom: 20px;">خطا در ذخیره تنظیمات: ' . $e->getMessage() . '</div>';
+function ss_upsert_setting($pdo, $key, $value, $table = 'settings') {
+    $update = $pdo->prepare("UPDATE {$table} SET setting_value = :v WHERE setting_key = :k");
+    $update->execute([':v' => $value, ':k' => $key]);
+    if ($update->rowCount() === 0) {
+        $insert = $pdo->prepare("INSERT INTO {$table} (setting_key, setting_value) VALUES (:k, :v)");
+        $insert->execute([':k' => $key, ':v' => $value]);
     }
 }
 
-// 3. خواندن مقادیر فعلی از دیتابیس برای نمایش در فرم
-try {
-    $stmt = $pdo->query("SELECT setting_key, setting_value FROM settings WHERE setting_key IN ('rahpayam_api_key', 'rahpayam_pattern_code')");
-    $settings_data = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
-} catch (PDOException $e) {
-    die("خطا در خواندن تنظیمات از دیتابیس: " . $e->getMessage());
+if (function_exists('isLoggedIn') && !isLoggedIn()) { header('Location: login.php'); exit; }
+
+$pdo = ss_get_pdo();
+if (!$pdo) { http_response_code(500); echo '<h2>Database error</h2>'; exit; }
+
+$errors = []; $success = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
+    $token = $_POST['csrf_token'] ?? '';
+    if (!ss_verify_csrf($token)) { $errors[] = 'درخواست نامعتبر است.'; }
+    else {
+        $apiKey      = trim((string)($_POST['msgway_api_key'] ?? ''));
+        $templateId  = trim((string)($_POST['msgway_template_code'] ?? ''));
+        $lineNumber  = trim((string)($_POST['msgway_lineNumber'] ?? ''));
+        $mobileFmt   = trim((string)($_POST['msgway_mobile_format'] ?? 'auto'));
+        $resendTime  = (int)($_POST['msgway_resend_time'] ?? 60);
+        $otpLen      = (int)($_POST['msgway_otp_length'] ?? 6);
+
+        if ($apiKey === '') $errors[] = 'کلید API نمی‌تواند خالی باشد.';
+        if ($templateId === '' || !preg_match('/^\d+$/', $templateId)) $errors[] = 'کد الگو باید عددی باشد.';
+        if (!in_array($mobileFmt, ['auto','+98','09'], true)) $mobileFmt = 'auto';
+        if ($resendTime < 15 || $resendTime > 600) $resendTime = 60;
+        if ($otpLen < 4 || $otpLen > 8) $otpLen = 6;
+
+        if (!$errors) {
+            try {
+                $pdo->beginTransaction();
+                ss_upsert_setting($pdo, 'msgway_api_key',        $apiKey);
+                ss_upsert_setting($pdo, 'msgway_template_code',  $templateId);
+                ss_upsert_setting($pdo, 'msgway_lineNumber',     $lineNumber);
+                ss_upsert_setting($pdo, 'msgway_mobile_format',  $mobileFmt);
+                ss_upsert_setting($pdo, 'msgway_resend_time',    (string)$resendTime);
+                ss_upsert_setting($pdo, 'msgway_otp_length',     (string)$otpLen);
+                // legacy mirrors
+                ss_upsert_setting($pdo, 'rahpayam_api_key',      $apiKey);
+                ss_upsert_setting($pdo, 'rahpayam_pattern_code', $templateId);
+                $pdo->commit();
+                $success = 'تنظیمات با موفقیت ذخیره شد.';
+            } catch (Throwable $e) {
+                $pdo->rollBack();
+                error_log('Save settings error: ' . $e->getMessage());
+                $errors[] = 'خطا در ذخیره تنظیمات.';
+            }
+        }
+    }
 }
 
-$currentApiKey = $settings_data['rahpayam_api_key'] ?? '';
-$currentPatternCode = $settings_data['rahpayam_pattern_code'] ?? '';
-
+$cur = [
+    'msgway_api_key'       => ss_get_setting($pdo, 'msgway_api_key') ?: ss_get_setting($pdo, 'rahpayam_api_key'),
+    'msgway_template_code' => ss_get_setting($pdo, 'msgway_template_code') ?: ss_get_setting($pdo, 'rahpayam_pattern_code'),
+    'msgway_lineNumber'    => ss_get_setting($pdo, 'msgway_lineNumber'),
+    'msgway_mobile_format' => ss_get_setting($pdo, 'msgway_mobile_format') ?: 'auto',
+    'msgway_resend_time'   => ss_get_setting($pdo, 'msgway_resend_time') ?: '60',
+    'msgway_otp_length'    => ss_get_setting($pdo, 'msgway_otp_length') ?: '6',
+];
 ?>
-
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
-    <meta charset="UTF-8">
-    <title>تنظیمات ماژول پیامک راه پیام</title>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; padding: 20px; background-color: #f6f9fa; color: #1b1f2b; }
-        .container { max-width: 800px; margin: auto; padding: 20px; background-color: #fff; border: 1px solid #e1e4e8; border-radius: 6px; }
-        h2 { border-bottom: 1px solid #e1e4e8; padding-bottom: 10px; }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; font-weight: 600; }
-        input[type="text"] { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 5px; }
-        button { padding: 10px 20px; background-color: #00b0a4; color: white; border: none; cursor: pointer; border-radius: 5px; font-size: 16px; }
-        button:hover { background-color: #098b82; }
-        .help-text { font-size: 12px; color: #666; margin-top: 5px; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>تنظیمات پیامک (MSGway)</title>
+<style>
+:root{--primary:#00b0a4;--primary-dark:#098b82;--bg:#f6f8fb;--card:#fff;--text:#1f2937;--muted:#6b7280;--border:#e5e7eb}
+*{box-sizing:border-box}body{margin:0;font-family:IRANSans,Vazirmatn,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
+.container{max-width:980px;margin:40px auto;padding:0 16px}.card{background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:0 8px 30px rgba(2,8,20,.05);overflow:hidden}
+.head{display:flex;gap:12px;align-items:center;padding:18px 22px;background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff}
+.head .logo{width:36px;height:36px;display:grid;place-items:center;background:rgba(255,255,255,.15);border-radius:12px}
+.body{padding:22px}.grid{display:grid;grid-template-columns:1fr;gap:16px}@media(min-width:760px){.grid{grid-template-columns:1fr 1fr}}
+label{display:block;font-weight:700;margin-bottom:8px}.muted{color:var(--muted);font-size:12px}
+input,select{width:100%;padding:12px 14px;border:1px solid var(--border);border-radius:12px;background:#fff;outline:none}
+input:focus,select:focus{border-color:var(--primary);box-shadow:0 0 0 4px rgba(0,176,164,.1)}
+.actions{margin-top:12px}.btn{appearance:none;border:none;border-radius:12px;padding:12px 18px;font-weight:800;cursor:pointer}
+.btn-primary{background:var(--primary);color:#fff;box-shadow:0 6px 18px rgba(0,176,164,.25)}
+.alert{padding:12px 16px;border-radius:12px;margin:10px 0;border:1px solid}.alert-success{background:#ecfdf5;color:#065f46;border-color:#a7f3d0}.alert-danger{background:#fef2f2;color:#991b1b;border-color:#fecaca}
+.kbd{font:500 12px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;background:#f3f4f6;border:1px solid #e5e7eb;padding:2px 6px;border-radius:6px}
+</style>
 </head>
 <body>
+<div class="container">
+  <div class="card">
+    <div class="head"><div class="logo">💬</div><h3>تنظیمات پیامک تایید هویت (MSGway / راه‌پیام)</h3></div>
+    <div class="body">
+      <?php if ($success): ?><div class="alert alert-success"><?php echo ss_h($success); ?></div><?php endif; ?>
+      <?php if ($errors): ?><div class="alert alert-danger"><?php foreach ($errors as $e) echo '<div>• '.ss_h($e).'</div>'; ?></div><?php endif; ?>
 
-    <div class="container">
-        <h2>تنظیمات درگاه پیامک (راه پیام)</h2>
-        <?php echo $message; ?>
-        <form method="POST" action="">
-            <div class="form-group">
-                <label for="api_key">API Key (کلید وب‌سرویس):</label>
-                <input type="text" id="api_key" name="rahpayam_api_key" value="<?php echo htmlspecialchars($currentApiKey); ?>" required>
-            </div>
-            <div class="form-group">
-                <label for="pattern_code">Pattern Code (کد الگو برای OTP):</label>
-                <input type="text" id="pattern_code" name="rahpayam_pattern_code" value="<?php echo htmlspecialchars($currentPatternCode); ?>" required>
-                <p class="help-text">الگوی شما در پنل راه پیام باید شامل یک متغیر (مثلا %param1%) برای ارسال کد تایید باشد.</p>
-            </div>
-            <button type="submit" name="save_settings">ذخیره تنظیمات</button>
-        </form>
+      <form method="post">
+        <input type="hidden" name="csrf_token" value="<?php echo ss_h(ss_csrf_token()); ?>">
+        <div class="grid">
+          <div>
+            <label for="msgway_api_key">کلید API</label>
+            <input type="password" id="msgway_api_key" name="msgway_api_key" value="<?php echo ss_h($cur['msgway_api_key']); ?>" placeholder="sk_live_xxx">
+            <div class="muted">کلید معتبر MSGway/راه‌پیام</div>
+          </div>
+          <div>
+            <label for="msgway_template_code">کد الگو (templateID)</label>
+            <input type="text" id="msgway_template_code" name="msgway_template_code" value="<?php echo ss_h($cur['msgway_template_code']); ?>" placeholder="مثال: 3" inputmode="numeric">
+            <div class="muted">الگوی OTP تأییدشده (مثلاً 3)</div>
+          </div>
+          <div>
+            <label for="msgway_lineNumber">خط ارسال (lineNumber)</label>
+            <input type="text" id="msgway_lineNumber" name="msgway_lineNumber" value="<?php echo ss_h($cur['msgway_lineNumber']); ?>" placeholder="مثال: 3000xxxxx (اختیاری/در برخی حساب‌ها اجباری)">
+            <div class="muted">اگر حساب شما نیاز به تعیین خط دارد، این فیلد را پر کنید؛ عدم تکمیل می‌تواند 400 بدهد.</div>
+          </div>
+          <div>
+            <label for="msgway_mobile_format">فرمت ذخیره شماره</label>
+            <select id="msgway_mobile_format" name="msgway_mobile_format">
+              <?php $opts=['auto'=>'اتوماتیک (+98 به‌صورت هوشمند)','+98'=>'+98xxxxxxxxxx','09'=>'09xxxxxxxxx']; foreach($opts as $k=>$v){ $sel = ($cur['msgway_mobile_format']===$k)?'selected':''; echo "<option value=\"$k\" $sel>$v</option>"; } ?>
+            </select>
+          </div>
+          <div>
+            <label for="msgway_resend_time">زمان ارسال مجدد (ثانیه)</label>
+            <input type="number" id="msgway_resend_time" name="msgway_resend_time" min="15" max="600" value="<?php echo ss_h($cur['msgway_resend_time']); ?>">
+          </div>
+          <div>
+            <label for="msgway_otp_length">طول کد OTP</label>
+            <input type="number" id="msgway_otp_length" name="msgway_otp_length" min="4" max="8" value="<?php echo ss_h($cur['msgway_otp_length']); ?>">
+          </div>
+        </div>
+        <div class="actions"><button type="submit" name="save_settings" class="btn btn-primary">ذخیره تنظیمات</button></div>
+      </form>
+
+      <p class="muted">نکته: اگر ۴۰۰ می‌گیرید، معمولاً یکی از موارد زیر است: <span class="kbd">apiKey</span> نامعتبر، <span class="kbd">templateID</span> تأییدنشده، نیاز به <span class="kbd">lineNumber</span>، یا فرمت اشتباه شماره.</p>
     </div>
-
+  </div>
+</div>
 </body>
 </html>

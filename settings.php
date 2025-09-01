@@ -63,6 +63,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         
+        if ($action === 'sms_settings') {
+            $sms_settings = [
+                'msgway_api_key' => sanitizeInput($_POST['msgway_api_key']),
+                'msgway_lineNumber' => sanitizeInput($_POST['msgway_lineNumber']),
+                'msgway_otp_length' => (int)$_POST['msgway_otp_length'],
+                'msgway_template_code' => sanitizeInput($_POST['msgway_template_code']),
+                'msgway_resend_time' => (int)$_POST['msgway_resend_time'],
+                'msgway_mobile_format' => sanitizeInput($_POST['msgway_mobile_format'])
+            ];
+            
+            try {
+                $pdo->beginTransaction();
+                
+                foreach ($sms_settings as $key => $value) {
+                    $stmt = $pdo->prepare("
+                        INSERT INTO settings (setting_key, setting_value) 
+                        VALUES (?, ?) 
+                        ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)
+                    ");
+                    $stmt->execute([$key, $value]);
+                }
+                
+                $pdo->commit();
+                logActivity($_SESSION['user_id'], 'update_sms_settings', 'settings', null);
+                setMessage('تنظیمات درگاه پیامک با موفقیت بروزرسانی شد', 'success');
+                
+            } catch (PDOException $e) {
+                $pdo->rollback();
+                error_log("خطا در بروزرسانی تنظیمات پیامک: " . $e->getMessage());
+                $errors[] = 'خطا در ذخیره تنظیمات پیامک';
+            }
+        }
+        
         if ($action === 'email_settings') {
             $email_settings = [
                 'mail_host' => sanitizeInput($_POST['mail_host']),
@@ -200,7 +233,6 @@ include 'includes/header.php';
 <?php endif; ?>
 
 <div class="row">
-    <!-- تنظیمات عمومی -->
     <div class="col-lg-8 mb-4">
         <div class="card">
             <div class="card-header">
@@ -270,7 +302,65 @@ include 'includes/header.php';
             </div>
         </div>
         
-        <!-- تنظیمات ایمیل -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-comment-sms me-2 text-primary"></i>
+                    تنظیمات درگاه پیامک (msgway)
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <input type="hidden" name="action" value="sms_settings">
+                    <input type="hidden" name="csrf_token" value="<?php echo $csrf_token; ?>">
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="msgway_api_key" class="form-label">کلید API (apiKey)</label>
+                            <input type="text" class="form-control" id="msgway_api_key" name="msgway_api_key" 
+                                   value="<?php echo htmlspecialchars($current_settings['msgway_api_key'] ?? ''); ?>">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="msgway_lineNumber" class="form-label">شماره خط ارسال</label>
+                            <input type="text" class="form-control" id="msgway_lineNumber" name="msgway_lineNumber" 
+                                   value="<?php echo htmlspecialchars($current_settings['msgway_lineNumber'] ?? ''); ?>">
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="msgway_template_code" class="form-label">کد پترن پیامک (templateID)</label>
+                            <input type="text" class="form-control" id="msgway_template_code" name="msgway_template_code" 
+                                   value="<?php echo htmlspecialchars($current_settings['msgway_template_code'] ?? ''); ?>">
+                        </div>
+                        <div class="col-md-6">
+                             <label for="msgway_otp_length" class="form-label">طول کد تایید (OTP)</label>
+                            <input type="number" class="form-control" id="msgway_otp_length" name="msgway_otp_length" 
+                                   value="<?php echo htmlspecialchars($current_settings['msgway_otp_length'] ?? '6'); ?>" min="4" max="8">
+                        </div>
+                    </div>
+
+                     <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="msgway_resend_time" class="form-label">زمان ارسال مجدد کد (ثانیه)</label>
+                            <input type="number" class="form-control" id="msgway_resend_time" name="msgway_resend_time" 
+                                   value="<?php echo htmlspecialchars($current_settings['msgway_resend_time'] ?? '120'); ?>" min="30">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="msgway_mobile_format" class="form-label">فرمت شماره موبایل ورودی (Regex)</label>
+                            <input type="text" class="form-control" id="msgway_mobile_format" name="msgway_mobile_format" 
+                                   value="<?php echo htmlspecialchars($current_settings['msgway_mobile_format'] ?? '^09[0-9]{9}$'); ?>">
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-2"></i>
+                        ذخیره تنظیمات پیامک
+                    </button>
+                </form>
+            </div>
+        </div>
+
         <div class="card mt-4">
             <div class="card-header">
                 <h5 class="mb-0">
@@ -341,9 +431,7 @@ include 'includes/header.php';
         </div>
     </div>
     
-    <!-- آمار سیستم و ابزارها -->
     <div class="col-lg-4">
-        <!-- آمار سیستم -->
         <div class="card mb-4">
             <div class="card-header">
                 <h5 class="mb-0">
@@ -388,7 +476,6 @@ include 'includes/header.php';
             </div>
         </div>
         
-        <!-- ابزارهای سیستم -->
         <div class="card">
             <div class="card-header">
                 <h5 class="mb-0">
@@ -397,7 +484,6 @@ include 'includes/header.php';
                 </h5>
             </div>
             <div class="card-body">
-                <!-- پشتیبان‌گیری -->
                 <form method="POST" class="mb-3">
                     <input type="hidden" name="action" value="backup_database">
                     <input type="hidden" name="csrf_token" value="<?php echo $csrf_token; ?>">
@@ -407,7 +493,6 @@ include 'includes/header.php';
                     </button>
                 </form>
                 
-                <!-- پاک کردن لاگ‌ها -->
                 <form method="POST" class="mb-3">
                     <input type="hidden" name="action" value="clear_logs">
                     <input type="hidden" name="csrf_token" value="<?php echo $csrf_token; ?>">
@@ -428,7 +513,6 @@ include 'includes/header.php';
                     </button>
                 </form>
                 
-                <!-- مشاهده لاگ‌ها -->
                 <a href="activity_logs.php" class="btn btn-info w-100">
                     <i class="fas fa-list me-2"></i>
                     مشاهده لاگ‌های فعالیت

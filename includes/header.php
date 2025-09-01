@@ -1208,7 +1208,16 @@ $current_user = getCurrentUser();
                 <i class="fas fa-user-cog"></i>
                 کاربران
             </a>
-            <?php endif; ?>
+            
+    <!-- CodeHub: گیت‌هاب شخصیِ قطعه‌کدها داخل CRM -->
+    <a href="codehub/snippets.php" class="menu-item <?php 
+        $isCodeHub = (strpos($_SERVER['REQUEST_URI'] ?? '', '/codehub/') !== false) 
+                     || (strpos($_SERVER['PHP_SELF'] ?? '', 'codehub/') !== false);
+        echo $isCodeHub ? 'active' : ''; ?>">
+        <i class="fas fa-code"></i>
+        مدیریت قطعه‌کدها
+    </a>
+<?php endif; ?>
         </div>
         
         <div class="sidebar-user">

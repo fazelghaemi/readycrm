@@ -1,84 +1,77 @@
-
 <?php
 
 /**
  * این تابع مسئول ارسال پیامک OTP با استفاده از سرویس msgway است.
- *
+ * [نسخه نهایی و صحیح]
  * @param string $mobile_number شماره موبایل دریافت کننده
  * @param string $otp_code کد یکبار مصرف جهت ارسال
- * @return bool برمی‌گرداند true در صورت موفقیت و false در صورت شکست
+ * @param PDO $pdo آبجکت اتصال به دیتابیس
+ * @return string برمی‌گرداند "SUCCESS" در صورت موفقیت و یک پیام خطای کاربرپسند در صورت شکست
  */
-function send_otp_message($mobile_number, $otp_code) {
-    
-    // 1. اتصال به دیتابیس
-    // مطمئن شوید آدرس این فایل صحیح است.
-    require_once('config/database.php'); // <--- !!! 
+function send_otp_message($mobile_number, $otp_code, $pdo)
+{
+    if (!$pdo) {
+        return "خطای سرور: اتصال به دیتابیس برقرار نیست.";
+    }
 
-    // 2. خواندن تنظیمات از دیتابیس
     try {
-        // متغیر $pdo باید در فایل database.php تعریف شده باشد
-        $stmt = $pdo->query("SELECT setting_key, setting_value FROM settings WHERE setting_key IN ('msgway_api_key', 'msgway_pattern_code')");
+        $stmt = $pdo->query("SELECT setting_key, setting_value FROM settings WHERE setting_key IN ('msgway_api_key', 'msgway_template_code')");
         $settings_data = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
     } catch (PDOException $e) {
-        // در یک پروژه واقعی، بهتر است خطا را در یک فایل لاگ ذخیره کنید
-        // error_log("Database Error in sms_client: " . $e->getMessage());
-        return false;
+        error_log("Database Error in sms_client: " . $e->getMessage());
+        return "خطای سرور: امکان خواندن تنظیمات وجود ندارد.";
     }
 
-    $apiKey = $settings_data['msgway_api_key'] ?? '';
-    $patternCode = $settings_data['msgway_pattern_code'] ?? '';
+    $apiKey = trim($settings_data['msgway_api_key'] ?? '');
+    $templateId = trim($settings_data['msgway_template_code'] ?? '');
 
-    // 3. بررسی وجود تنظیمات
-    // اگر کلید API یا کد الگو در دیتابیس ذخیره نشده باشد، عملیات متوقف می‌شود
-    if (empty($apiKey) || empty($patternCode)) {
-        // error_log("SMS settings (API Key or Pattern Code) are not configured.");
-        return false;
+    if (empty($apiKey) || empty($templateId)) {
+        return "خطای تنظیمات: کلید API یا کد پترن در پنل تنظیمات وارد نشده است.";
     }
 
-    // 4. آماده‌سازی و ارسال درخواست به msgway (بر اساس مستندات رسمی)
+    // تبدیل خودکار شماره موبایل به فرمت +98
+    $formatted_mobile = $mobile_number;
+    if (substr($formatted_mobile, 0, 1) === '0') {
+        $formatted_mobile = '+98' . substr($formatted_mobile, 1);
+    }
+    
     $curl = curl_init();
+
+    // پارامترها مطابق با آخرین نمونه کد صحیح
+    $params = [
+        "mobile" => $formatted_mobile,
+        "method" => "sms",
+        "templateID" => (int)$templateId,
+        "code" => $otp_code
+    ];
 
     curl_setopt_array($curl, array(
       CURLOPT_URL => 'https://api.msgway.com/send',
-      CURLOPT_RETURNTRANSFER => true,
-      CURLOPT_ENCODING => '',
-      CURLOPT_MAXREDIRS => 10,
-      CURLOPT_TIMEOUT => 10, // اضافه کردن تایم‌اوت ۱۰ ثانیه‌ای
-      CURLOPT_FOLLOWLOCATION => true,
-      CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
       CURLOPT_CUSTOMREQUEST => 'POST',
-      CURLOPT_POSTFIELDS => json_encode([
-        "template_code" => $patternCode,
-        "receptor" => $mobile_number,
-        "params" => [
-            [
-                "name" => "param1",
-                "value" => $otp_code
-            ]
-        ]
-    ]),
+      CURLOPT_RETURNTRANSFER => true,
+      CURLOPT_POSTFIELDS => json_encode($params), 
       CURLOPT_HTTPHEADER => array(
-        'MsgWay-ApiKey: ' . $apiKey,
-        'Content-Type: application/json'
+        'apiKey: ' . $apiKey,
       ),
+      CURLOPT_TIMEOUT => 20,
+      CURLOPT_CONNECTTIMEOUT => 20
     ));
 
     $response = curl_exec($curl);
     $err = curl_error($curl);
     curl_close($curl);
 
-    // 5. تحلیل پاسخ و بازگرداندن نتیجه
     if ($err) {
-      // خطا در ارتباط cURL
-      // error_log("cURL Error in sms_client: " . $err);
-      return false;
+      error_log("cURL Error: " . $err);
+      return "خطای اتصال: امکان برقراری ارتباط با سرور پیامک وجود ندارد.";
     } 
     
     $response_data = json_decode($response, true);
-    if (isset($response_data['status']) && $response_data['status'] == 'OK') {
-        return true; // پیامک با موفقیت برای ارسال در صف قرار گرفت
+    if (isset($response_data['code']) && $response_data['code'] == 200) {
+        return "SUCCESS";
     }
     
-    // error_log("msgway API Error: " . $response);
-    return false; // شکست در ارسال پیامک
+    error_log("msgway API Error: " . $response);
+    $error_message = $response_data['message'] ?? 'پاسخ سرور پیامک نامعتبر بود. لطفاً تنظیمات و اعتبار حساب خود را بررسی کنید.';
+    return "خطا از سرور پیامک: " . $error_message;
 }

@@ -1,0 +1,1 @@
+function chCopy(id){const el=document.getElementById(id);if(!el)return;const t=el.innerText||el.textContent||'';navigator.clipboard.writeText(t).then(()=>alert('کپی شد'));}
