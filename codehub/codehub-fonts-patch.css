@@ -1,0 +1,2 @@
+:root{ --font-ui: "YekanBakhFaNum", "IRANSans", "Tahoma", sans-serif; }
+.ch-scope, .ch-scope *:not(i):not([class*="fa-"]){ font-family: var(--font-ui) !important; }

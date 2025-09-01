@@ -1,9 +1,6 @@
 <?php
-require_once __DIR__ . '/../includes/codehub.php';
+require_once __DIR__ . '/../includes/codehub_bootstrap.php';
 codehub_require_admin();
-$id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-if ($id) {
-    if (codehub_is_starred($id)) codehub_unstar($id);
-    else codehub_star($id);
-}
-header("Location: snippet_view.php?id=".$id); exit;
+$sid = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+if ($sid) codehub_toggle_star($sid);
+header('Location: snippet_view.php?id='.$sid); exit;

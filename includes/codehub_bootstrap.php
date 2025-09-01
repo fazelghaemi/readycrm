@@ -1,0 +1,152 @@
+<?php
+if (session_status() === PHP_SESSION_NONE) session_start();
+function e($s){ return htmlspecialchars((string)$s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
+function generateCSRFToken(): string {
+    if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    return $_SESSION['csrf_token'];
+}
+function verifyCSRFToken(string $t): bool {
+    return isset($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], $t);
+}
+function codehub_user_id(){
+    if (!empty($_SESSION['user_id'])) return (int)$_SESSION['user_id'];
+    if (!empty($_SESSION['user']['id'])) return (int)$_SESSION['user']['id'];
+    return null;
+}
+function codehub_require_admin(){ return true; }
+function codehub_pdo(): PDO {
+    static $pdo = null;
+    if ($pdo instanceof PDO) return $pdo;
+    if (isset($GLOBALS['pdo']) && $GLOBALS['pdo'] instanceof PDO) return $GLOBALS['pdo'];
+    $try = [__DIR__.'/config.php', __DIR__.'/../includes/config.php', __DIR__.'/../config.php'];
+    foreach ($try as $f) if (is_file($f)) { include_once $f; break; }
+    $host = defined('DB_HOST') ? DB_HOST : getenv('DB_HOST');
+    $name = defined('DB_NAME') ? DB_NAME : getenv('DB_NAME');
+    $user = defined('DB_USER') ? DB_USER : getenv('DB_USER');
+    $pass = defined('DB_PASS') ? DB_PASS : getenv('DB_PASS');
+    $dsn  = defined('DB_DSN')  ? DB_DSN  : None;
+    if (!$dsn && $host && $name) $dsn = "mysql:host={$host};dbname={$name};charset=utf8mb4";
+    if (!$dsn) { throw new RuntimeException('Database DSN not configured for CodeHub'); }
+    $pdo = new PDO($dsn, $user ?: '', $pass ?: '', [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4"
+    ]);
+    return $pdo;
+}
+function codehub_install(){
+    $pdo = codehub_pdo();
+    $pdo->exec("CREATE TABLE IF NOT EXISTS code_snippets (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        language VARCHAR(50) DEFAULT 'text',
+        tags VARCHAR(255) DEFAULT NULL,
+        description TEXT DEFAULT NULL,
+        content LONGTEXT NOT NULL,
+        is_private TINYINT(1) DEFAULT 0,
+        created_by INT DEFAULT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+        INDEX(lang_idx) (language),
+        FULLTEXT KEY ft_title_desc (title, description, content)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    $pdo->exec("CREATE TABLE IF NOT EXISTS code_snippet_versions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        snippet_id INT NOT NULL,
+        version_no INT NOT NULL,
+        content LONGTEXT NOT NULL,
+        changelog VARCHAR(255) DEFAULT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uniq_version (snippet_id, version_no),
+        CONSTRAINT fk_versions_snip FOREIGN KEY (snippet_id) REFERENCES code_snippets(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    $pdo->exec("CREATE TABLE IF NOT EXISTS code_snippet_files (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        snippet_id INT NOT NULL,
+        filename VARCHAR(255) NOT NULL,
+        filepath VARCHAR(255) NOT NULL,
+        mime VARCHAR(100) DEFAULT NULL,
+        size INT DEFAULT NULL,
+        uploaded_by INT DEFAULT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT fk_files_snip FOREIGN KEY (snippet_id) REFERENCES code_snippets(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    $pdo->exec("CREATE TABLE IF NOT EXISTS code_snippet_stars (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        snippet_id INT NOT NULL,
+        user_id INT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uniq_star (snippet_id, user_id),
+        CONSTRAINT fk_stars_snip FOREIGN KEY (snippet_id) REFERENCES code_snippets(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+}
+codehub_install();
+function codehub_snippet_list($q=null,$lang=null,$tag=null,$limit=100,$offset=0){
+    $pdo = codehub_pdo();
+    $sql = "SELECT * FROM code_snippets WHERE 1=1";
+    $params=[];
+    if ($q){ $sql.=" AND (title LIKE :q OR description LIKE :q OR content LIKE :q)"; $params[':q']="%$q%"; }
+    if ($lang){ $sql.=" AND language=:l"; $params[':l']=$lang; }
+    if ($tag){ $sql.=" AND (FIND_IN_SET(:t, REPLACE(tags,' ',''))>0 OR tags LIKE :t2)"; $params[':t']=$tag; $params[':t2']="%$tag%"; }
+    $sql.=" ORDER BY id DESC LIMIT :lim OFFSET :off";
+    $st=$pdo->prepare($sql); $st->bindValue(':lim',(int)$limit,PDO::PARAM_INT); $st->bindValue(':off',(int)$offset,PDO::PARAM_INT);
+    forEach($params as $k=>$v){ if($k==':lim'||$k==':off') continue; $st->bindValue($k,$v); }
+    $st->execute(); return $st->fetchAll();
+}
+function codehub_snippet_get(int $id){
+    $st=codehub_pdo()->prepare("SELECT * FROM code_snippets WHERE id=:id"); $st->execute([':id'=>$id]); return $st->fetch();
+}
+function codehub_next_version_no($sid){
+    $st=codehub_pdo()->prepare("SELECT MAX(version_no) AS v FROM code_snippet_versions WHERE snippet_id=:sid");
+    $st->execute([':sid'=>$sid]); $v=(int)($st->fetch()['v']??0); return $v+1;
+}
+function codehub_snippet_create(array $data){
+    $pdo=codehub_pdo(); $pdo->beginTransaction();
+    try{
+        $st=$pdo->prepare("INSERT INTO code_snippets (title,language,tags,description,content,is_private,created_by,created_at) VALUES (:title,:language,:tags,:description,:content,:is_private,:uid,NOW())");
+        $st->execute([
+            ':title'=>$data['title'],':language'=>$data['language']?:'text',':tags'=>$data['tags']?:null,':description'=>$data['description']?:null,
+            ':content'=>$data['content'],':is_private'=>!empty($data['is_private'])?1:0, ':uid'=>codehub_user_id()
+        ]);
+        $id=(int)$pdo->lastInsertId();
+        $ver=codehub_next_version_no($id);
+        $pdo->prepare("INSERT INTO code_snippet_versions (snippet_id,version_no,content,changelog) VALUES (:sid,:v,:c,:m)")
+            ->execute([':sid'=>$id, ':v'=>$ver, ':c'=>$data['content'], ':m'=>'initial']);
+        $pdo->commit(); return $id;
+    }catch(Throwable $e){ $pdo->rollBack(); throw $e; }
+}
+function codehub_snippet_update(int $id, array $data){
+    $pdo=codehub_pdo(); $pdo->beginTransaction();
+    try{
+        $st=$pdo->prepare("UPDATE code_snippets SET title=:title, language=:language, tags=:tags, description=:description, content=:content, is_private=:is_private, updated_at=NOW() WHERE id=:id");
+        $st->execute([
+            ':title'=>$data['title'],':language'=>$data['language']?:'text',':tags'=>$data['tags']?:null,':description'=>$data['description']?:null,
+            ':content'=>$data['content'], ':is_private'=>!empty($data['is_private'])?1:0, ':id'=>$id
+        ]);
+        $ver=codehub_next_version_no($id);
+        $pdo->prepare("INSERT INTO code_snippet_versions (snippet_id,version_no,content,changelog) VALUES (:sid,:v,:c,:m)")
+            ->execute([':sid'=>$id, ':v'=>$ver, ':c'=>$data['content'], ':m'=>'update']);
+        $pdo->commit();
+    }catch(Throwable $e){ $pdo->RollBack(); throw $e; }
+}
+function codehub_snippet_delete(int $id){
+    $st=codehub_pdo()->prepare("DELETE FROM code_snippets WHERE id=:id"); $st->execute([':id'=>$id]);
+}
+function codehub_versions(int $sid){
+    $st=codehub_pdo()->prepare("SELECT * FROM code_snippet_versions WHERE snippet_id=:sid ORDER BY version_no DESC");
+    $st->execute([':sid'=>$sid]); return $st->fetchAll();
+}
+function codehub_is_starred(int $sid): bool{
+    $uid=codehub_user_id(); if(!$uid) return false;
+    $st=codehub_pdo()->prepare("SELECT 1 FROM code_snippet_stars WHERE snippet_id=:sid AND user_id=:u"); $st->execute([':sid'=>$sid, ':u'=>$uid]);
+    return (bool)$st->fetchColumn();
+}
+function codehub_toggle_star(int $sid){
+    $uid=codehub_user_id(); if(!$uid) return;
+    $pdo=codehub_pdo();
+    if (codehub_is_starred($sid)){
+        $pdo->prepare("DELETE FROM code_snippet_stars WHERE snippet_id=:sid AND user_id=:u")->execute([':sid'=>$sid, ':u'=>$uid]);
+    } else {
+        $pdo->prepare("INSERT IGNORE INTO code_snippet_stars (snippet_id,user_id) VALUES (:sid,:u)")->execute([':sid'=>$sid, ':u'=>$uid]);
+    }
+}
