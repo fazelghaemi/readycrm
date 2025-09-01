@@ -299,7 +299,7 @@ body{
             </div>
 
             <div style="margin-top:12px">
-              <a href="/msgway_otp_module/login_with_otp.php" class="btn-otp">ورود با کد تایید (راه‌پیام)</a>
+              <a href="/login_with_otp.php" class="btn-otp">ورود با کد تایید (راه‌پیام)</a>
             </div>
 
             <div class="mb-3">
