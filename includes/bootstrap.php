@@ -1,21 +1,24 @@
 <?php
 /**
- * ReadyCRM – Global Bootstrap (safe v2)
- * یک نقطه ورود واحد و ایمن برای همه صفحات
- * - بارگذاری امن کانفیگ/دیتابیس/هلپرها
- * - هندل نبودن آیکون‌پک با فالبک
- * - دیباگ اختیاری از طریق ?debug=1
+ * ReadyCRM – Global Bootstrap (safe v2.1)
+ * - Single entry point to load config, database, helpers
+ * - Robust path resolution (works on Windows/Linux)
+ * - Icon pack integration with safe fallbacks
+ * - Debugging via ?debug=1 or READY_DEBUG env
+ *
+ * Usage:
+ *   require_once __DIR__ . '/includes/bootstrap.php';
  */
 
 @session_start();
 
-// ---- Paths
-define('RC_ROOT', realpath(__DIR__ . '/..'));             // /includes -> / (root)
-define('RC_INC',  RC_ROOT . '/includes');
-define('RC_CFG',  RC_ROOT . '/config');
-define('RC_PUB',  RC_ROOT . '/public');
+// ---- Paths (resolve absolute root based on this file location)
+define('RC_ROOT', realpath(__DIR__ . '/..'));   // /includes -> /
+define('RC_INC',  RC_ROOT . DIRECTORY_SEPARATOR . 'includes');
+define('RC_CFG',  RC_ROOT . DIRECTORY_SEPARATOR . 'config');
+define('RC_PUB',  RC_ROOT . DIRECTORY_SEPARATOR . 'public');
 
-// ---- Debug toggle (?debug=1 یا READY_DEBUG env)
+// ---- Debug toggle
 $debug = (isset($_GET['debug']) && $_GET['debug'] == '1') || getenv('READY_DEBUG');
 if ($debug) {
     ini_set('display_errors', '1');
@@ -23,7 +26,7 @@ if ($debug) {
     error_reporting(E_ALL);
 }
 
-// ---- Basic requirements (with graceful errors)
+// ---- Require helper with graceful error
 function rc_require($file, $label) {
     if (!is_file($file)) {
         http_response_code(500);
@@ -34,37 +37,44 @@ function rc_require($file, $label) {
     require_once $file;
 }
 
-// 1) Core config & DB
-rc_require(RC_CFG . '/config.php',   'config');
-rc_require(RC_CFG . '/database.php', 'database');
+// ---- Load core config & database
+rc_require(RC_CFG . DIRECTORY_SEPARATOR . 'config.php',   'config');
+rc_require(RC_CFG . DIRECTORY_SEPARATOR . 'database.php', 'database');
 
-// 2) Helpers
-rc_require(RC_INC . '/functions.php','functions');
-rc_require(RC_INC . '/auth.php',     'auth');
+// ---- Load common helpers
+rc_require(RC_INC . DIRECTORY_SEPARATOR . 'functions.php','functions');
+rc_require(RC_INC . DIRECTORY_SEPARATOR . 'auth.php',     'auth');
 
-// 3) Icon Pack (with fallback)
-//    اگر فایل نبود یا مسیرها آماده نبودند، فالبک تعریف می‌شود تا سایت نخوابد.
-if (is_file(RC_INC . '/iconpack.php')) {
-    // مسیرهای آیکون‌پک را اگر قبلاً تعریف نشده‌اند، اینجا تعریف کن
-    if (!defined('RS_ICON_DIR'))       define('RS_ICON_DIR', RC_ROOT . '/assets/icons');
-    if (!defined('RS_ICON_CACHE_DIR')) define('RS_ICON_CACHE_DIR', RC_PUB . '/assets/cache/icons');
-    if (!defined('RS_ICON_BASE_URL'))  define('RS_ICON_BASE_URL', '/assets/icons');
-    require_once RC_INC . '/iconpack.php';
-    if (!function_exists('rs_icon')) {
-        // اگر فایل هست ولی تابع نبود (خطای سینتکس احتمالی)، یک فالبک امن
-        function rs_icon($name,$size=20,$class='',$attrs=[]){ return '<span class="rs-icon rs-'.$size.'"></span>'; }
-    }
-} else {
-    // فالبک اگر iconpack.php فعلاً در دسترس نیست
-    if (!function_exists('rs_icon')) {
-        function rs_icon($name,$size=20,$class='',$attrs=[]){ return '<span class="rs-icon rs-'.$size.'"></span>'; }
+// ---- Icon Pack integration (with safe fallback)
+// Define icon paths if not already defined elsewhere.
+if (!defined('RS_ICON_DIR'))       define('RS_ICON_DIR', RC_ROOT . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR . 'icons');
+if (!defined('RS_ICON_CACHE_DIR')) define('RS_ICON_CACHE_DIR', RC_PUB  . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR . 'cache' . DIRECTORY_SEPARATOR . 'icons');
+if (!defined('RS_ICON_BASE_URL'))  define('RS_ICON_BASE_URL', '/assets/icons');
+
+$iconpack_file = RC_INC . DIRECTORY_SEPARATOR . 'iconpack.php';
+if (is_file($iconpack_file)) {
+    require_once $iconpack_file;
+}
+if (!function_exists('rs_icon')) {
+    // Safe fallback to prevent fatal errors when iconpack is missing/broken
+    function rs_icon($name, $size = 20, $class = '', array $attrs = []) {
+        $size = (int)$size ?: 20;
+        $cls = trim('rs-icon rs-' . $size . ' ' . preg_replace('/[^A-Za-z0-9\-\_\s]/', '', (string)$class));
+        $attr_html = '';
+        foreach ($attrs as $k=>$v) {
+            $k = strtolower($k);
+            if (preg_match('/^(role|aria\-[a-z]+|data\-[a-z0-9\-\_]+|title)$/', $k)) {
+                $attr_html .= ' ' . $k . '="' . htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8') . '"';
+            }
+        }
+        return '<span class="' . htmlspecialchars($cls, ENT_QUOTES, 'UTF-8') . '" style="width:'.$size.'px;height:'.$size.'px;"'.$attr_html.'></span>';
     }
 }
 
-// 4) Default internal encoding
+// ---- Encoding safety
 if (function_exists('mb_internal_encoding')) { @mb_internal_encoding('UTF-8'); }
 
-// 5) Ensure cache dir exists (silently)
-if (defined('RS_ICON_CACHE_DIR') && !is_dir(RS_ICON_CACHE_DIR)) {
+// ---- Ensure icon cache dir exists
+if (!is_dir(RS_ICON_CACHE_DIR)) {
     @mkdir(RS_ICON_CACHE_DIR, 0775, true);
 }
