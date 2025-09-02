@@ -1,7 +1,0 @@
-
-Options -Indexes
-<FilesMatch "\.(sql|md|sh)$">Require all denied</FilesMatch>
-RewriteEngine On
-RewriteRule ^includes/ - [F,L]
-RewriteRule ^storage/ - [F,L]
-RewriteRule ^assets/.*\.(php|phar|inc)$ - [F,L]
