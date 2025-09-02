@@ -36,15 +36,6 @@ function codehub_require_admin(){
     if (function_exists('hasRole') && !hasRole('admin')) { http_response_code(403); exit('Forbidden'); }
     return true;
 }
-    if (function_exists('hasRole') && !hasRole('admin')) { http_response_code(403); exit('Forbidden'); }
-    return true;
-}
-    if (function_exists('hasRole') && !hasRole('admin')) { http_response_code(403); exit('Forbidden'); }
-    return true;
-}
-    if (function_exists('hasRole') && !hasRole('admin')) { http_response_code(403); exit('Forbidden'); }
-    return true;
-}
 function codehub_pdo(): PDO {
     static $pdo = null;
     if ($pdo instanceof PDO) return $pdo;
