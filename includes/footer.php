@@ -1,4 +1,4 @@
-        </div>
+</div>
     </div>
 
     <!-- Scripts -->
@@ -322,5 +322,6 @@
     <?php if (isset($additional_js)): ?>
         <?php echo $additional_js; ?>
     <?php endif; ?>
+    <script src="/public/assets/js/rs-icons.js" defer></script>
 </body>
 </html>
