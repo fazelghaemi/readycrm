@@ -14,3 +14,14 @@ if (!isLoggedIn()) {
 header('Location: dashboard.php');
 exit();
 ?>
+
+<?php define('READYCRM_UI', true); ?>
+<?php require __DIR__ . '/includes/header.php'; ?>
+<div class="main-layout">
+  <?php require __DIR__ . '/includes/sidebar.php'; ?>
+  <div class="main-content">
+    <?php require __DIR__ . '/includes/topbar.php'; ?>
+    <?php require __DIR__ . '/pages/dashboard.php'; ?>
+  </div>
+</div>
+<?php require __DIR__ . '/includes/footer.php'; ?>
