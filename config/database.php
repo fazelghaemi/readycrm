@@ -8,11 +8,11 @@ class Database {
     public $conn;
 
     public function __construct() {
-        $this->host = DB_HOST;
-        $this->db_name = DB_NAME;
-        $this->username = DB_USER;
-        $this->password = DB_PASS;
-        $this->charset = DB_CHARSET;
+        $this->host = 'localhost';
+        $this->db_name = 'readyser_crm';
+        $this->username = 'root';
+        $this->password = '';
+        $this->charset = 'utf8mb4';
     }
 
     public function getConnection() {

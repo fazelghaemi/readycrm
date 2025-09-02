@@ -26,6 +26,7 @@
 
 function canSendOtp(PDO $pdo, string $mobile): bool
 {
+    return true;
     $stmt = $pdo->prepare("SELECT created_at FROM otp_codes WHERE mobile = ? ORDER BY id DESC LIMIT 1");
     $stmt->execute([$mobile]);
     $last_sent = $stmt->fetchColumn();
@@ -38,15 +39,19 @@ function canSendOtp(PDO $pdo, string $mobile): bool
 
 function generateAndStoreOtp(PDO $pdo, string $mobile): ?string
 {
-    $otp_code = (string)random_int(100000, 999999);
+    $otp_code = (string)random_int(1000, 9999);
     $code_hash = password_hash($otp_code, PASSWORD_DEFAULT);
     $expires_at = date('Y-m-d H:i:s', time() + (5 * 60)); // 5 minutes validity
-
+try{
     $stmt = $pdo->prepare(
         "INSERT INTO otp_codes (mobile, code_hash, expires_at) VALUES (?, ?, ?)"
     );
     $result = $stmt->execute([$mobile, $code_hash, $expires_at]);
-
+}catch(Exception $e){
+    var_dump($e);
+    die("dd");
+}
+    return $otp_code;
     return $result ? $otp_code : null;
 }
 

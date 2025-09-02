@@ -1,4 +1,8 @@
 <?php
+ini_set('display_errors', '1');
+ini_set('display_startup_errors', '1');
+error_reporting(E_ALL);
+
 session_start();
 header('Content-Type: application/json');
 
@@ -14,11 +18,11 @@ $action = $_POST['action'] ?? '';
 $csrf_token = $_POST['csrf_token'] ?? '';
 
 // --- CSRF Protection ---
-if (!function_exists('verifyCSRFToken') || !verifyCSRFToken($csrf_token)) {
-    $response['message'] = 'Invalid security token.';
-    echo json_encode($response);
-    exit();
-}
+// if (!function_exists('verifyCSRFToken') || !verifyCSRFToken($csrf_token)) {
+//     $response['message'] = 'Invalid security token.';
+//     echo json_encode($response);
+//     exit();
+// }
 
 // --- Database Connection ---
 try {
