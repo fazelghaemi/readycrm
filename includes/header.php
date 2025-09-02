@@ -9,6 +9,13 @@ $current_user = getCurrentUser();
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
+<link rel="preload" href="/public/assets/fonts/YekanBakhFaNum-Regular.woff" as="font" type="font/woff" crossorigin>
+<link rel="preload" href="/public/assets/fonts/YekanBakhFaNum-SemiBold.woff" as="font" type="font/woff" crossorigin>
+<link rel="preload" href="/public/assets/fonts/YekanBakhFaNum-Bold.woff" as="font" type="font/woff" crossorigin>
+<link rel="preload" href="/public/assets/fonts/YekanBakhFaNum-ExtraBold.woff" as="font" type="font/woff" crossorigin>
+<link rel="stylesheet" href="/public/assets/css/fonts.css?v=1">
+<link rel="stylesheet" href="/codehub/codehub-fonts-patch.css?v=1">
+
     <!-- Favicon -->
 <link rel="icon" type="image/png" href="/favicon.png?v=1">
 <link rel="shortcut icon" type="image/png" href="/favicon.png?v=1">
