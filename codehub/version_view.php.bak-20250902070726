@@ -15,7 +15,7 @@ $breadcrumbs = [
   ['label'=>$snip['title'],'url'=>'/codehub/snippet_view.php?id='.$sid,'active'=>false],
   ['label'=>'نسخه '.$vno,'active'=>true],
 ];
-include_once __DIR__ . '/../includes/header.php';
+include_once __DIR__ . '/../include/header.php';
 ?>
 <link rel="stylesheet" href="/codehub/assets/codehub.css">
 <div class="ch-scope">

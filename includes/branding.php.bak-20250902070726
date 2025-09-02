@@ -8,7 +8,7 @@ declare(strict_types=1);
 
 /** @param PDO $pdo */
 function brand_setting(PDO $pdo, string $key, string $default): string {
-    $stmt = $pdo->prepare("SELECT setting_value FROM settings WHERE setting_key =:k LIMIT 1");
+    $stmt = $pdo->prepare("SELECT `value` FROM settings WHERE `key`=:k LIMIT 1");
     $stmt->execute([':k' => $key]);
     $val = $stmt->fetchColumn();
     return ($val !== false) ? (string)$val : $default;

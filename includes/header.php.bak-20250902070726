@@ -1,7 +1,4 @@
 <?php
-require_once __DIR__ . '/security_bootstrap.php';
-?>
-<?php
 if (!isLoggedIn()) {
     header('Location: login.php');
     exit();
@@ -1287,5 +1284,3 @@ $current_user = getCurrentUser();
         <!-- Content -->
         <div class="content">
             <?php echo displayMessage(); ?>
-<link rel="stylesheet" href="/public/assets/readystudio-theme.css?v=1">
-<?php if (isset($pdo)) { require_once __DIR__ . '/branding.php'; if (function_exists('brand_print_css_vars')) brand_print_css_vars($pdo); } ?>

@@ -12,7 +12,7 @@ $versions = codehub_versions($id);
 $page_title = e($item['title']).' | CodeHub';
 $breadcrumbs = [ ['label'=>'CodeHub','url'=>'/codehub/snippets.php','active'=>false], ['label'=>$item['title'],'active'=>true] ];
 
-include_once __DIR__ . '/../includes/header.php';
+include_once __DIR__ . '/../include/header.php';
 ?>
 <link rel="stylesheet" href="/codehub/assets/codehub.css">
 <div class="ch-scope">

@@ -1,2 +1,5 @@
-:root{ --font-ui: "YekanBakhFaNum", "IRANSans", "Tahoma", sans-serif; }
-.ch-scope, .ch-scope *:not(i):not([class*="fa-"]){ font-family: var(--font-ui) !important; }
+/* codehub/codehub-fonts-patch.css */
+/* Force CodeHub to use global font */
+body, input, button, textarea, pre, code {
+  font-family: 'YekanBakhFaNum', system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Apple Color Emoji','Segoe UI Emoji', 'Segoe UI Symbol' !important;
+}

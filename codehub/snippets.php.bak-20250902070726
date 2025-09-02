@@ -14,7 +14,7 @@ $langs = ['text'=>'متن','php'=>'PHP','js'=>'JavaScript','ts'=>'TypeScript','h
 $page_title = 'CodeHub — مدیریت قطعه‌کدها';
 $breadcrumbs = [ ['label'=>'CodeHub','url'=>'/codehub/snippets.php','active'=>true] ];
 
-include_once __DIR__ . '/../includes/header.php';
+include_once __DIR__ . '/../include/header.php';
 ?>
 <link rel="stylesheet" href="/codehub/assets/codehub.css">
 <div class="ch-scope">

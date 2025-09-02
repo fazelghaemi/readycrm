@@ -13,6 +13,6 @@ function setting_get(PDO $pdo, string $key, $default = '') {
 /** @param PDO $pdo */
 function setting_set(PDO $pdo, string $key, $value): bool {
     $stmt = $pdo->prepare("INSERT INTO settings(setting_key,setting_value) VALUES(:k,:v)
-        ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)");
+        ON DUPLICATE KEY UPDATE `value` = VALUES(`value`)");
     return $stmt->execute([':k' => $key, ':v' => $value]);
 }
