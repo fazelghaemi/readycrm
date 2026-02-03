@@ -660,7 +660,7 @@ $csrf_token = generateCSRFToken();
                         </ul>
 
                         <div class="footer-text">
-                            توسعه یافته توسط تیم ردی استودیو | نسخه <?php echo APP_VERSION ?? '1.0.0'; ?>
+                            توسعه یافته توسط تیم ردی استودیو| نسخه <?php echo APP_VERSION ?? '1.0.0'; ?>
                         </div>
                     </div>
                 </div>
