@@ -1,5 +1,0 @@
-.ch-editor{display:flex;border:1px solid var(--ch-border);border-radius:14px;overflow:hidden;background:#0b1020;color:#e5e7eb;font-family:ui-monospace,Consolas,'Courier New',monospace}
-.ch-editor .gutter{width:56px;background:#0b1324;color:#6b7280;text-align:right;padding:8px 6px;user-select:none;overflow:hidden}
-.ch-editor .gutter .line{height:22px;line-height:22px;font-size:13px}
-.ch-editor textarea{flex:1;border:none;background:transparent;color:#e5e7eb;padding:8px 10px;resize:vertical;min-height:280px;line-height:22px;font-size:13px;outline:none;tab-size:2;white-space:pre}
-.ch-editor textarea::selection{background:#1f2937}
