@@ -1,0 +1,17 @@
+# Allow static assets
+<FilesMatch "\.(css|js|jpg|jpeg|png|gif|ico|svg|woff|woff2|ttf|eot)$">
+    Require all granted
+</FilesMatch>
+
+# Cache static assets
+<FilesMatch "\.(css|js|jpg|jpeg|png|gif|ico|svg|woff|woff2|ttf|eot)$">
+    ExpiresActive On
+    ExpiresDefault "access plus 1 month"
+    Header append Cache-Control "public"
+</FilesMatch>
+
+# Disable directory browsing
+Options -Indexes
+
+# Security headers
+Header always set X-Content-Type-Options nosniff

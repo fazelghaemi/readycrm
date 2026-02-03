@@ -1,0 +1,46 @@
+# Allow PHP execution in public directory
+<FilesMatch "\.php$">
+    Require all granted
+</FilesMatch>
+
+# Security headers for public files
+Header always set X-Content-Type-Options nosniff
+Header always set X-Frame-Options SAMEORIGIN
+Header always set X-XSS-Protection "1; mode=block"
+
+# Disable directory browsing
+Options -Indexes
+
+# Block access to sensitive files
+<FilesMatch "\.(sql|log|txt|md|env|ini|conf|bak|backup|old|orig|save|swp|tmp)$">
+    Require all denied
+</FilesMatch>
+
+# Block access to hidden files
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+# Prevent direct access to includes
+<FilesMatch "^(config|includes|functions|auth)\.php$">
+    Require all denied
+</FilesMatch>
+
+# Security: Block common attack patterns
+RewriteEngine On
+RewriteCond %{QUERY_STRING} (\<|%3C).*script.*(\>|%3E) [NC,OR]
+RewriteCond %{QUERY_STRING} GLOBALS(=|\[|\%[0-9A-Z]{0,2}) [OR]
+RewriteCond %{QUERY_STRING} _REQUEST(=|\[|\%[0-9A-Z]{0,2}) [OR]
+RewriteCond %{QUERY_STRING} proc/self/environ [OR]
+RewriteCond %{QUERY_STRING} mosConfig_[a-zA-Z_]{1,21}(=|\%3D) [OR]
+RewriteCond %{QUERY_STRING} base64_(en|de)code[^(]*\([^)]*\) [OR]
+RewriteCond %{QUERY_STRING} (<|%3C)([^s]*s)+cript.*(>|%3E) [NC,OR]
+RewriteCond %{QUERY_STRING} (\<|%3C).*iframe.*(\>|%3E) [NC]
+RewriteRule .* - [F]
+
+# Handle static files
+<FilesMatch "\.(css|js|jpg|jpeg|png|gif|ico|svg|woff|woff2|ttf|eot|pdf|doc|docx|xls|xlsx|txt)$">
+    ExpiresActive On
+    ExpiresDefault "access plus 1 month"
+    Header append Cache-Control "public"
+</FilesMatch>

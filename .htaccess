@@ -1,0 +1,49 @@
+# Enable rewrite engine
+RewriteEngine On
+
+# Handle all requests through index.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php [QSA,L]
+
+# Deny access to sensitive directories
+RewriteRule ^(private|database|config|includes|backups|uploads|logs)/ - [F,L]
+
+# Deny access to sensitive files
+<FilesMatch "\.(sql|log|txt|md|env|ini|conf|bak|backup|old|orig|save|swp|tmp)$">
+    Require all denied
+</FilesMatch>
+
+# Deny access to hidden files
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+# Disable directory browsing
+Options -Indexes
+
+# Security: Block common attack patterns
+RewriteCond %{QUERY_STRING} (\<|%3C).*script.*(\>|%3E) [NC,OR]
+RewriteCond %{QUERY_STRING} GLOBALS(=|\[|\%[0-9A-Z]{0,2}) [OR]
+RewriteCond %{QUERY_STRING} _REQUEST(=|\[|\%[0-9A-Z]{0,2}) [OR]
+RewriteCond %{QUERY_STRING} proc/self/environ [OR]
+RewriteCond %{QUERY_STRING} mosConfig_[a-zA-Z_]{1,21}(=|\%3D) [OR]
+RewriteCond %{QUERY_STRING} base64_(en|de)code[^(]*\([^)]*\) [OR]
+RewriteCond %{QUERY_STRING} (<|%3C)([^s]*s)+cript.*(>|%3E) [NC,OR]
+RewriteCond %{QUERY_STRING} (\<|%3C).*iframe.*(\>|%3E) [NC]
+RewriteRule .* - [F]
+
+# Block access to sensitive files
+RewriteRule ^(.*/)?\.git/ - [F,L]
+RewriteRule ^(.*/)?\.svn/ - [F,L]
+RewriteRule ^(.*/)?\.env - [F,L]
+RewriteRule ^(.*/)?composer\.(json|lock) - [F,L]
+RewriteRule ^(.*/)?package\.(json|lock) - [F,L]
+RewriteRule ^(.*/)?yarn\.lock - [F,L]
+RewriteRule ^(.*/)?\.htaccess - [F,L]
+RewriteRule ^(.*/)?\.htpasswd - [F,L]
+
+# Prevent access to backup files
+<FilesMatch "\.(bak|backup|old|orig|save|swp|tmp)$">
+    Require all denied
+</FilesMatch>
