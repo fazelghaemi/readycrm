@@ -1,5 +1,4 @@
 # Sensitive files
-*.env
 *.log
 *.sql
 *.bak
@@ -11,9 +10,7 @@
 *.tmp
 
 # Directories
-/backups/
-/config/
-/includes/
+
 
 # System files
 .DS_Store
