@@ -1,8 +1,19 @@
 <?php
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ * ReadyCRM V3.5 - ADVANCED TASKS MANAGER
+ * ══════════════════════════════════════════════════════════════════════════════
+ * مدیریت پیشرفته وظایف با قابلیت‌های عملیات گروهی، محاسبه پیشرفت، خروجی اکسل
+ * و طراحی مدرن فلت.
+ * * @version 3.5.0
+ * @author Ready Studio
+ * ══════════════════════════════════════════════════════════════════════════════
+ */
+
 $page_title = 'مدیریت وظایف';
 $breadcrumb = [
     ['title' => 'داشبورد', 'url' => 'dashboard.php'],
-    ['title' => 'وظایف']
+    ['title' => 'لیست وظایف']
 ];
 
 require_once __DIR__ . '/../private/config.php';
@@ -10,1130 +21,801 @@ require_once __DIR__ . '/../private/database.php';
 require_once __DIR__ . '/../private/auth.php';
 require_once __DIR__ . '/../private/functions.php';
 
-// بررسی دسترسی
+// ─── AUTH CHECK ─────────────────────────────────────────────────────────────
 if (!hasPermission('view_tasks')) {
     setMessage('شما دسترسی لازم برای مشاهده این صفحه را ندارید', 'error');
     header('Location: dashboard.php');
     exit();
 }
 
-// پردازش درخواست‌ها
+// ─── ICONS REPOSITORY (MODERN SVG) ──────────────────────────────────────────
+$icons = [
+    'plus' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>',
+    'search' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>',
+    'filter' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>',
+    'eye' => '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>',
+    'edit' => '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>',
+    'trash' => '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>',
+    'check' => '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>',
+    'clock' => '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>',
+    'calendar' => '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>',
+    'check-circle' => '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>',
+    'alert-circle' => '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>',
+    'download' => '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>',
+    'briefcase' => '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>',
+    'more' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>'
+];
+
+// ─── HANDLE POST ACTIONS ────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
+    $csrf_token = $_POST['csrf_token'] ?? '';
 
-    if ($action === 'delete' && hasPermission('delete_task')) {
-        $task_id = (int)$_POST['task_id'];
-
-        try {
-            $stmt = $pdo->prepare("DELETE FROM tasks WHERE id = ?");
-            $stmt->execute([$task_id]);
-
-            if ($stmt->rowCount() > 0) {
-                logActivity($_SESSION['user_id'], 'delete_task', 'tasks', $task_id);
-                setMessage('وظیفه با موفقیت حذف شد', 'success');
-            } else {
-                setMessage('وظیفه یافت نشد', 'error');
-            }
-        } catch (PDOException $e) {
-            error_log("خطا در حذف وظیفه: " . $e->getMessage());
-            setMessage('خطا در حذف وظیفه', 'error');
+    if (verifyCSRFToken($csrf_token)) {
+        
+        // 1. Single Delete
+        if ($action === 'delete' && hasPermission('delete_task')) {
+            $task_id = (int)$_POST['task_id'];
+            $pdo->prepare("DELETE FROM tasks WHERE id = ?")->execute([$task_id]);
+            logActivity($_SESSION['user_id'], 'delete_task', 'tasks', $task_id);
+            setMessage('وظیفه با موفقیت حذف شد', 'success');
         }
-    }
 
-    if ($action === 'update_status' && hasPermission('edit_task')) {
-        $task_id = (int)$_POST['task_id'];
-        $new_status = $_POST['new_status'];
+        // 2. Quick Add
+        if ($action === 'quick_add' && hasPermission('add_task')) {
+            $title = sanitizeInput($_POST['quick_title']);
+            $due_date = $_POST['quick_due_date'] ?: null;
+            $assigned_to = (int)$_POST['quick_assigned_to'] ?: null;
 
-        try {
-            $completed_at = $new_status === 'completed' ? 'NOW()' : 'NULL';
-
-            $stmt = $pdo->prepare("UPDATE tasks SET status = ?, completed_at = $completed_at WHERE id = ?");
-            $stmt->execute([$new_status, $task_id]);
-
-            if ($stmt->rowCount() > 0) {
-                logActivity($_SESSION['user_id'], 'update_task_status', 'tasks', $task_id, ['status' => $new_status]);
-                setMessage('وضعیت وظیفه بروزرسانی شد', 'success');
-            }
-        } catch (PDOException $e) {
-            error_log("خطا در بروزرسانی وضعیت وظیفه: " . $e->getMessage());
-            setMessage('خطا در بروزرسانی وضعیت', 'error');
-        }
-    }
-
-    if ($action === 'quick_add' && hasPermission('add_task')) {
-        $title = sanitizeInput($_POST['quick_title']);
-        $due_date = $_POST['quick_due_date'];
-        $assigned_to = (int)$_POST['quick_assigned_to'];
-
-        if ($title) {
-            try {
-                $stmt = $pdo->prepare("
-                    INSERT INTO tasks (title, due_date, assigned_to, created_by)
-                    VALUES (?, ?, ?, ?)
-                ");
-                $stmt->execute([$title, $due_date ?: null, $assigned_to ?: null, $_SESSION['user_id']]);
-
+            if ($title) {
+                $stmt = $pdo->prepare("INSERT INTO tasks (title, due_date, assigned_to, created_by, status) VALUES (?, ?, ?, ?, 'pending')");
+                $stmt->execute([$title, $due_date, $assigned_to, $_SESSION['user_id']]);
                 logActivity($_SESSION['user_id'], 'create_task', 'tasks', $pdo->lastInsertId());
                 setMessage('وظیفه جدید اضافه شد', 'success');
-            } catch (PDOException $e) {
-                error_log("خطا در افزودن وظیفه: " . $e->getMessage());
-                setMessage('خطا در افزودن وظیفه', 'error');
             }
+        }
+
+        // 3. Bulk Actions (Delete)
+        if ($action === 'bulk_delete' && hasPermission('delete_task')) {
+            $ids = explode(',', $_POST['task_ids'] ?? '');
+            $ids = array_map('intval', $ids);
+            if (!empty($ids)) {
+                $placeholders = implode(',', array_fill(0, count($ids), '?'));
+                $stmt = $pdo->prepare("DELETE FROM tasks WHERE id IN ($placeholders)");
+                $stmt->execute($ids);
+                setMessage(count($ids) . ' وظیفه با موفقیت حذف شد', 'success');
+            }
+        }
+
+        // 4. Bulk Actions (Status Update)
+        if ($action === 'bulk_status' && hasPermission('edit_task')) {
+            $ids = explode(',', $_POST['task_ids'] ?? '');
+            $new_status = $_POST['new_status'];
+            $ids = array_map('intval', $ids);
+            
+            if (!empty($ids) && in_array($new_status, ['pending', 'in_progress', 'completed', 'cancelled'])) {
+                $placeholders = implode(',', array_fill(0, count($ids), '?'));
+                $completed_at = $new_status === 'completed' ? 'NOW()' : 'NULL';
+                
+                // Construct query carefully
+                $sql = "UPDATE tasks SET status = '$new_status', completed_at = $completed_at WHERE id IN ($placeholders)";
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute($ids);
+                setMessage(count($ids) . ' وظیفه بروزرسانی شد', 'success');
+            }
+        }
+
+        // 5. Export to CSV
+        if ($action === 'export') {
+            header('Content-Type: text/csv; charset=utf-8');
+            header('Content-Disposition: attachment; filename=tasks_export_' . date('Y-m-d') . '.csv');
+            $output = fopen('php://output', 'w');
+            
+            // Add BOM for Excel UTF-8 compatibility
+            fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
+            
+            fputcsv($output, ['ID', 'عنوان', 'وضعیت', 'اولویت', 'سررسید', 'مسئول', 'ایجاد کننده']);
+            
+            // Re-run the filter query (simplified for export)
+            // ... (Logic assumes filters from GET are passed, for simplicity we export latest 1000)
+            $stmt = $pdo->query("SELECT t.id, t.title, t.status, t.priority, t.due_date, 
+                               CONCAT(u.first_name, ' ', u.last_name) as assignee,
+                               CONCAT(c.first_name, ' ', c.last_name) as creator
+                               FROM tasks t 
+                               LEFT JOIN users u ON t.assigned_to = u.id
+                               LEFT JOIN users c ON t.created_by = c.id
+                               ORDER BY t.created_at DESC LIMIT 1000");
+            
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                $row['status'] = getStatusTitle($row['status'], 'task');
+                $row['priority'] = getPriorityTitle($row['priority']);
+                fputcsv($output, $row);
+            }
+            fclose($output);
+            exit();
         }
     }
 }
 
-// دریافت فیلترها
+// ─── QUERY BUILDER ──────────────────────────────────────────────────────────
 $search = $_GET['search'] ?? '';
 $status = $_GET['status'] ?? '';
 $priority = $_GET['priority'] ?? '';
-$type = $_GET['type'] ?? '';
 $assigned_to = $_GET['assigned_to'] ?? '';
-$due_filter = $_GET['due_filter'] ?? '';
-$page = (int)($_GET['page'] ?? 1);
-$per_page = RECORDS_PER_PAGE;
-$offset = ($page - 1) * $per_page;
+$date_filter = $_GET['date_filter'] ?? '';
+$sort = $_GET['sort'] ?? 'newest';
 
-// ساخت کوئری
-$where_conditions = [];
+$page = (int)($_GET['page'] ?? 1);
+$limit = 20;
+$offset = ($page - 1) * $limit;
+
+$where = ["1=1"];
 $params = [];
 
+// Filters
 if ($search) {
-    $where_conditions[] = "(t.title LIKE ? OR t.description LIKE ?)";
-    $search_term = "%$search%";
-    $params = array_merge($params, [$search_term, $search_term]);
+    $where[] = "(t.title LIKE ? OR t.description LIKE ?)";
+    $params[] = "%$search%";
+    $params[] = "%$search%";
 }
-
 if ($status) {
-    $where_conditions[] = "t.status = ?";
+    $where[] = "t.status = ?";
     $params[] = $status;
 }
-
 if ($priority) {
-    $where_conditions[] = "t.priority = ?";
+    $where[] = "t.priority = ?";
     $params[] = $priority;
 }
-
-if ($type) {
-    $where_conditions[] = "t.type = ?";
-    $params[] = $type;
-}
-
 if ($assigned_to) {
-    $where_conditions[] = "t.assigned_to = ?";
+    $where[] = "t.assigned_to = ?";
     $params[] = $assigned_to;
 }
-
-if ($due_filter) {
-    switch ($due_filter) {
-        case 'today':
-            $where_conditions[] = "DATE(t.due_date) = CURDATE()";
-            break;
-        case 'tomorrow':
-            $where_conditions[] = "DATE(t.due_date) = DATE_ADD(CURDATE(), INTERVAL 1 DAY)";
-            break;
-        case 'this_week':
-            $where_conditions[] = "WEEK(t.due_date) = WEEK(CURDATE()) AND YEAR(t.due_date) = YEAR(CURDATE())";
-            break;
-        case 'overdue':
-            $where_conditions[] = "t.due_date < NOW() AND t.status != 'completed'";
-            break;
-    }
+if ($date_filter === 'today') {
+    $where[] = "DATE(t.due_date) = CURDATE()";
+} elseif ($date_filter === 'overdue') {
+    $where[] = "t.due_date < NOW() AND t.status != 'completed'";
+} elseif ($date_filter === 'week') {
+    $where[] = "YEARWEEK(t.due_date, 1) = YEARWEEK(CURDATE(), 1)";
+} elseif ($date_filter === 'my_tasks') {
+    $where[] = "t.assigned_to = " . $_SESSION['user_id'];
 }
 
-$where_clause = $where_conditions ? 'WHERE ' . implode(' AND ', $where_conditions) : '';
+// Sorting
+$order_by = "t.created_at DESC";
+if ($sort === 'oldest') $order_by = "t.created_at ASC";
+if ($sort === 'due_asc') $order_by = "ISNULL(t.due_date), t.due_date ASC";
+if ($sort === 'due_desc') $order_by = "t.due_date DESC";
+if ($sort === 'priority') $order_by = "FIELD(t.priority, 'urgent', 'high', 'medium', 'low')";
 
-// دریافت تعداد کل رکوردها
-$count_sql = "SELECT COUNT(*) FROM tasks t $where_clause";
-$total_records = $pdo->prepare($count_sql);
-$total_records->execute($params);
-$total_records = $total_records->fetchColumn();
+$where_sql = implode(' AND ', $where);
 
-// دریافت وظایف
-$sql = "
-    SELECT
-        t.*,
-        CONCAT(u.first_name, ' ', u.last_name) as assigned_user,
-        CONCAT(cb.first_name, ' ', cb.last_name) as created_user,
-        CASE
-            WHEN t.related_type = 'customer' THEN (SELECT CONCAT(first_name, ' ', last_name) FROM customers WHERE id = t.related_id)
-            WHEN t.related_type = 'lead' THEN (SELECT CONCAT(first_name, ' ', last_name) FROM leads WHERE id = t.related_id)
-            ELSE NULL
-        END as related_name
-    FROM tasks t
-    LEFT JOIN users u ON t.assigned_to = u.id
-    LEFT JOIN users cb ON t.created_by = cb.id
-    $where_clause
-    ORDER BY
-        CASE t.status WHEN 'completed' THEN 3 WHEN 'cancelled' THEN 4 ELSE 1 END,
-        CASE t.priority
-            WHEN 'urgent' THEN 1
-            WHEN 'high' THEN 2
-            WHEN 'medium' THEN 3
-            WHEN 'low' THEN 4
-        END,
-        t.due_date ASC,
-        t.created_at DESC
-    LIMIT $per_page OFFSET $offset
-";
-
-$tasks = $pdo->prepare($sql);
-$tasks->execute($params);
-$tasks = $tasks->fetchAll();
-
-// دریافت کاربران برای فیلتر
-$users = $pdo->query("SELECT id, first_name, last_name FROM users WHERE status = 'active' ORDER BY first_name")->fetchAll();
-
-// آمار وظایف
+// Fetch Stats (Advanced)
 $stats = [
     'total' => $pdo->query("SELECT COUNT(*) FROM tasks")->fetchColumn(),
-    'pending' => $pdo->query("SELECT COUNT(*) FROM tasks WHERE status = 'pending'")->fetchColumn(),
-    'in_progress' => $pdo->query("SELECT COUNT(*) FROM tasks WHERE status = 'in_progress'")->fetchColumn(),
-    'completed' => $pdo->query("SELECT COUNT(*) FROM tasks WHERE status = 'completed'")->fetchColumn(),
-    'overdue' => $pdo->query("SELECT COUNT(*) FROM tasks WHERE due_date < NOW() AND status NOT IN ('completed', 'cancelled')")->fetchColumn(),
+    'my_pending' => $pdo->prepare("SELECT COUNT(*) FROM tasks WHERE assigned_to = ? AND status = 'pending'")->execute([$_SESSION['user_id']]) ? $pdo->query("SELECT COUNT(*) FROM tasks WHERE assigned_to = {$_SESSION['user_id']} AND status = 'pending'")->fetchColumn() : 0,
+    'urgent' => $pdo->query("SELECT COUNT(*) FROM tasks WHERE priority = 'urgent' AND status != 'completed'")->fetchColumn(),
+    'overdue' => $pdo->query("SELECT COUNT(*) FROM tasks WHERE due_date < NOW() AND status != 'completed'")->fetchColumn(),
 ];
+
+// Fetch Tasks with Subtask Progress
+$sql = "
+    SELECT t.*, 
+           CONCAT(u.first_name, ' ', u.last_name) as assignee_name, 
+           u.avatar as assignee_avatar,
+           CASE 
+                WHEN t.related_type = 'customer' THEN (SELECT CONCAT(first_name, ' ', last_name) FROM customers WHERE id = t.related_id)
+                WHEN t.related_type = 'lead' THEN (SELECT CONCAT(first_name, ' ', last_name) FROM leads WHERE id = t.related_id)
+           END as related_name,
+           (SELECT COUNT(*) FROM task_subtasks WHERE task_id = t.id) as total_subs,
+           (SELECT COUNT(*) FROM task_subtasks WHERE task_id = t.id AND is_completed = 1) as done_subs
+    FROM tasks t
+    LEFT JOIN users u ON t.assigned_to = u.id
+    WHERE $where_sql
+    ORDER BY $order_by
+    LIMIT $limit OFFSET $offset
+";
+
+$stmt = $pdo->prepare($sql);
+$stmt->execute($params);
+$tasks = $stmt->fetchAll();
+
+// Pagination count
+$count_stmt = $pdo->prepare("SELECT COUNT(*) FROM tasks t WHERE $where_sql");
+$count_stmt->execute($params);
+$total_records = $count_stmt->fetchColumn();
+$total_pages = ceil($total_records / $limit);
+
+$users = $pdo->query("SELECT id, first_name, last_name FROM users WHERE status = 'active'")->fetchAll();
+$csrf_token = generateCSRFToken();
 
 include __DIR__ . '/../private/header.php';
 ?>
 
+<!-- ─── STYLES ────────────────────────────────────────────────────────────── -->
 <style>
-/* ============================================================
-   TASKS PAGE SPECIFIC STYLES
-   ============================================================ */
-
-/* Stats Cards Row */
-.stats-row {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 1.25rem;
-    margin-bottom: 2rem;
-}
-
-.stat-card-mini {
-    background: var(--brand-dark-card);
-    border: 1px solid var(--brand-dark-border);
-    border-radius: var(--radius-lg);
-    padding: 1.25rem 1rem;
-    text-align: center;
-    transition: var(--transition-smooth);
-    position: relative;
-    overflow: hidden;
-}
-
-.stat-card-mini::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    background: var(--gradient-primary);
-    opacity: 0;
-    transition: var(--transition-base);
-}
-
-.stat-card-mini:hover::before {
-    opacity: 1;
-}
-
-.stat-card-mini:hover {
-    transform: translateY(-4px);
-    border-color: var(--brand-primary);
-    box-shadow: var(--shadow-brand);
-}
-
-.stat-card-mini .stat-value {
-    font-size: 1.75rem;
-    font-weight: 700;
-    line-height: 1;
-    margin-bottom: 0.4rem;
-    color: var(--brand-primary);
-}
-
-.stat-card-mini .stat-label {
-    font-size: 0.8rem;
-    color: var(--text-gray-400);
-    font-weight: 500;
-}
-
-.stat-card-mini.stat-warning .stat-value { color: #fbbf24; }
-.stat-card-mini.stat-info .stat-value { color: #60a5fa; }
-.stat-card-mini.stat-success .stat-value { color: #34d399; }
-.stat-card-mini.stat-danger .stat-value { color: #f87171; }
-
-/* Page Header */
-.page-header-tasks {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 2rem;
-    gap: 1.5rem;
-    flex-wrap: wrap;
-}
-
-.page-header-tasks .header-left h4 {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--text-white);
-    margin-bottom: 0.35rem;
-}
-
-.page-header-tasks .header-left p {
-    color: var(--text-gray-400);
-    font-size: 0.9rem;
-    margin: 0;
-}
-
-.page-header-tasks .header-right {
-    display: flex;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-}
-
-/* Filter Card */
-.filter-card {
-    background: var(--brand-dark-card);
-    border: 1px solid var(--brand-dark-border);
-    border-radius: var(--radius-lg);
-    padding: 1.5rem;
-    margin-bottom: 1.75rem;
-}
-
-.filter-card .form-label {
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: var(--text-gray-300);
-    margin-bottom: 0.5rem;
-    letter-spacing: 0.01em;
-}
-
-.filter-card .form-control,
-.filter-card .form-select {
-    background: var(--brand-dark-input);
-    border: 1.5px solid var(--brand-dark-border);
-    border-radius: var(--radius-md);
-    color: var(--text-white);
-    font-size: 0.9rem;
-    padding: 0.65rem 0.85rem;
-    transition: var(--transition-base);
-}
-
-.filter-card .form-control:focus,
-.filter-card .form-select:focus {
-    border-color: var(--brand-primary);
-    box-shadow: 0 0 0 3px rgba(0, 176, 164, 0.15);
-    background: var(--brand-dark);
-}
-
-.filter-card .form-control::placeholder {
-    color: var(--text-gray-500);
-}
-
-.filter-card .btn-outline-primary {
-    border-color: var(--brand-primary);
-    color: var(--brand-primary);
-}
-
-.filter-card .btn-outline-primary:hover {
-    background: var(--brand-primary);
-    color: white;
-}
-
-/* Tasks Table Card */
-.tasks-table-card {
-    background: var(--brand-dark-card);
-    border: 1px solid var(--brand-dark-border);
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-}
-
-.tasks-table-card .card-header {
-    background: linear-gradient(135deg, #0d0d0d 0%, #1a1a1a 100%);
-    border-bottom: 1px solid var(--brand-dark-border);
-    padding: 1.25rem 1.5rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.tasks-table-card .card-header h5 {
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: var(--text-white);
-    margin: 0;
-    display: flex;
-    align-items: center;
-    gap: 0.65rem;
-}
-
-.tasks-table-card .card-header h5 i {
-    color: var(--brand-primary);
-    font-size: 1rem;
-}
-
-.tasks-table-card .card-header .badge {
-    background: var(--brand-primary);
-    color: white;
-    font-size: 0.8rem;
-    padding: 0.35rem 0.75rem;
-    border-radius: var(--radius-full);
-    font-weight: 600;
-}
-
-.tasks-table-card .btn-outline-secondary {
-    border-color: var(--brand-dark-border);
-    color: var(--text-gray-300);
-    font-size: 0.85rem;
-}
-
-.tasks-table-card .btn-outline-secondary:hover {
-    background: var(--brand-dark-input);
-    border-color: var(--brand-primary);
-    color: var(--brand-primary);
-}
-
-/* Table Styles */
-.table-modern {
-    width: 100%;
-    margin: 0;
-    border-collapse: separate;
-    border-spacing: 0;
-}
-
-.table-modern thead th {
-    background: var(--brand-dark);
-    color: var(--text-gray-300);
-    font-size: 0.8rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    padding: 1rem 1.25rem;
-    border-bottom: 1px solid var(--brand-dark-border);
-    white-space: nowrap;
-}
-
-.table-modern tbody tr {
-    transition: var(--transition-base);
-    border-bottom: 1px solid var(--brand-dark-border);
-}
-
-.table-modern tbody tr:last-child {
-    border-bottom: none;
-}
-
-.table-modern tbody tr:hover {
-    background: rgba(0, 176, 164, 0.04);
-}
-
-.table-modern tbody td {
-    padding: 1rem 1.25rem;
-    color: var(--text-gray-100);
-    font-size: 0.9rem;
-    vertical-align: middle;
-}
-
-/* Task Title Cell */
-.task-title-cell {
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-}
-
-.task-title-cell .task-main-title {
-    font-weight: 600;
-    color: var(--text-white);
-    font-size: 0.95rem;
-}
-
-.task-title-cell .task-subtitle {
-    font-size: 0.78rem;
-    color: var(--text-gray-400);
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.task-title-cell .task-subtitle i {
-    font-size: 0.7rem;
-}
-
-/* Priority Badge */
-.priority-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.35rem 0.85rem;
-    border-radius: var(--radius-full);
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-}
-
-.priority-badge.priority-urgent {
-    background: rgba(239, 68, 68, 0.15);
-    color: #f87171;
-    border: 1px solid rgba(239, 68, 68, 0.3);
-}
-
-.priority-badge.priority-high {
-    background: rgba(251, 191, 36, 0.15);
-    color: #fbbf24;
-    border: 1px solid rgba(251, 191, 36, 0.3);
-}
-
-.priority-badge.priority-medium {
-    background: rgba(96, 165, 250, 0.15);
-    color: #60a5fa;
-    border: 1px solid rgba(96, 165, 250, 0.3);
-}
-
-.priority-badge.priority-low {
-    background: rgba(52, 211, 153, 0.15);
-    color: #34d399;
-    border: 1px solid rgba(52, 211, 153, 0.3);
-}
-
-.priority-badge i {
-    font-size: 0.7rem;
-}
-
-/* Status Badge */
-.status-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.35rem 0.85rem;
-    border-radius: var(--radius-full);
-    font-size: 0.75rem;
-    font-weight: 600;
-}
-
-.status-badge.status-pending {
-    background: rgba(251, 191, 36, 0.15);
-    color: #fbbf24;
-}
-
-.status-badge.status-in_progress {
-    background: rgba(96, 165, 250, 0.15);
-    color: #60a5fa;
-}
-
-.status-badge.status-completed {
-    background: rgba(52, 211, 153, 0.15);
-    color: #34d399;
-}
-
-.status-badge.status-cancelled {
-    background: rgba(156, 163, 175, 0.15);
-    color: #9ca3af;
-}
-
-/* Type Badge */
-.type-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.3rem 0.75rem;
-    background: var(--brand-dark-input);
-    border: 1px solid var(--brand-dark-border);
-    border-radius: var(--radius-md);
-    font-size: 0.75rem;
-    color: var(--text-gray-300);
-}
-
-.type-badge i {
-    color: var(--brand-primary);
-    font-size: 0.7rem;
-}
-
-/* Due Date */
-.due-date-cell {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-}
-
-.due-date-cell .due-date-main {
-    font-size: 0.85rem;
-    color: var(--text-white);
-    font-weight: 500;
-}
-
-.due-date-cell .due-date-sub {
-    font-size: 0.75rem;
-    color: var(--text-gray-500);
-}
-
-.due-date-cell.overdue .due-date-main {
-    color: #f87171;
-}
-
-/* User Avatar */
-.user-avatar-mini {
-    width: 32px;
-    height: 32px;
-    border-radius: var(--radius-full);
-    background: var(--gradient-primary);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-size: 0.75rem;
-    font-weight: 700;
-    text-transform: uppercase;
-}
-
-/* Action Buttons */
-.action-buttons {
-    display: flex;
-    gap: 0.5rem;
-    justify-content: flex-end;
-}
-
-.action-buttons .btn-sm {
-    padding: 0.4rem 0.75rem;
-    border-radius: var(--radius-md);
-    font-size: 0.8rem;
-    transition: var(--transition-base);
-}
-
-.action-buttons .btn-outline-info {
-    border-color: #60a5fa;
-    color: #60a5fa;
-}
-
-.action-buttons .btn-outline-info:hover {
-    background: rgba(96, 165, 250, 0.15);
-    border-color: #60a5fa;
-}
-
-.action-buttons .btn-outline-warning {
-    border-color: #fbbf24;
-    color: #fbbf24;
-}
-
-.action-buttons .btn-outline-warning:hover {
-    background: rgba(251, 191, 36, 0.15);
-    border-color: #fbbf24;
-}
-
-.action-buttons .btn-outline-danger {
-    border-color: #f87171;
-    color: #f87171;
-}
-
-.action-buttons .btn-outline-danger:hover {
-    background: rgba(239, 68, 68, 0.15);
-    border-color: #f87171;
-}
-
-/* Empty State */
-.empty-state-tasks {
-    text-align: center;
-    padding: 4rem 2rem;
-}
-
-.empty-state-tasks i {
-    font-size: 4rem;
-    color: var(--brand-dark-border);
-    margin-bottom: 1.5rem;
-}
-
-.empty-state-tasks h5 {
-    font-size: 1.25rem;
-    color: var(--text-gray-300);
-    margin-bottom: 0.75rem;
-}
-
-.empty-state-tasks p {
-    color: var(--text-gray-500);
-    font-size: 0.9rem;
-}
-
-/* Pagination */
-.pagination-wrapper {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1.5rem;
-    background: var(--brand-dark);
-    border-top: 1px solid var(--brand-dark-border);
-}
-
-.pagination-info {
-    font-size: 0.85rem;
-    color: var(--text-gray-400);
-}
-
-/* Quick Add Modal */
-.modal-content {
-    background: var(--brand-dark-card);
-    border: 1px solid var(--brand-dark-border);
-    border-radius: var(--radius-xl);
-}
-
-.modal-header {
-    background: linear-gradient(135deg, #0d0d0d 0%, #1a1a1a 100%);
-    border-bottom: 1px solid var(--brand-dark-border);
-    padding: 1.5rem;
-}
-
-.modal-header .modal-title {
-    font-size: 1.15rem;
-    font-weight: 700;
-    color: var(--text-white);
-}
-
-.modal-header .btn-close {
-    filter: invert(1);
-    opacity: 0.6;
-}
-
-.modal-header .btn-close:hover {
-    opacity: 1;
-}
-
-.modal-body {
-    padding: 1.75rem;
-}
-
-.modal-footer {
-    border-top: 1px solid var(--brand-dark-border);
-    padding: 1.25rem 1.75rem;
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-    .stats-row {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 1rem;
+    :root {
+        --brand: #00b0a4;
+        --brand-hover: #00968c;
+        --brand-soft: #e0f2f1;
+        --dark: #010101;
+        --gray-border: #e2e8f0;
+        --gray-text: #64748b;
+        --bg-light: #f8fafc;
+        --radius-card: 16px;
+        --radius-elem: 12px;
     }
 
-    .page-header-tasks {
-        flex-direction: column;
-        align-items: flex-start;
+    body { background-color: var(--bg-light); color: var(--dark); }
+
+    /* Stats Cards - Modern Flat */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
     }
 
-    .table-modern {
-        font-size: 0.85rem;
+    .stat-card {
+        background: white;
+        border: 1px solid var(--gray-border);
+        border-radius: var(--radius-card);
+        padding: 24px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: transform 0.2s, border-color 0.2s;
+        position: relative;
+        overflow: hidden;
+    }
+    .stat-card:hover { border-color: var(--brand); transform: translateY(-2px); }
+    .stat-card::after {
+        content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%;
+        background: var(--brand); opacity: 0; transition: 0.2s;
+    }
+    .stat-card:hover::after { opacity: 1; }
+
+    .stat-data h3 { font-size: 1.8rem; font-weight: 800; margin: 0; line-height: 1; color: var(--dark); }
+    .stat-data p { margin: 8px 0 0; color: var(--gray-text); font-size: 0.9rem; font-weight: 500; }
+    .stat-icon {
+        width: 56px; height: 56px; border-radius: 16px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.5rem;
     }
 
-    .table-modern thead th,
-    .table-modern tbody td {
-        padding: 0.75rem 0.85rem;
+    /* Filters Bar */
+    .filter-card {
+        background: white; border: 1px solid var(--gray-border);
+        border-radius: var(--radius-card); padding: 20px; margin-bottom: 24px;
+    }
+    .filter-row { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
+    .search-wrapper { flex-grow: 1; min-width: 250px; position: relative; }
+    .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--gray-text); }
+    
+    .form-control-custom {
+        width: 100%; padding: 10px 16px 10px 40px;
+        border: 1px solid var(--gray-border); border-radius: var(--radius-elem);
+        font-size: 0.95rem; outline: none; transition: 0.2s;
+    }
+    .form-select-custom {
+        padding: 10px 36px 10px 16px; /* RTL padding */
+        border: 1px solid var(--gray-border); border-radius: var(--radius-elem);
+        font-size: 0.9rem; outline: none; background-color: white; cursor: pointer;
+    }
+    .form-control-custom:focus, .form-select-custom:focus {
+        border-color: var(--brand); box-shadow: 0 0 0 3px rgba(0, 176, 164, 0.1);
     }
 
-    .action-buttons {
-        flex-direction: column;
+    /* Bulk Actions Bar */
+    .bulk-actions {
+        background: var(--brand); color: white;
+        padding: 12px 24px; border-radius: var(--radius-elem);
+        display: none; align-items: center; justify-content: space-between;
+        margin-bottom: 20px; animation: slideDown 0.3s ease;
     }
-}
+    @keyframes slideDown { from { transform: translateY(-10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+    /* Table */
+    .table-card {
+        background: white; border: 1px solid var(--gray-border);
+        border-radius: var(--radius-card); overflow: hidden;
+    }
+    .custom-table { width: 100%; border-collapse: collapse; }
+    .custom-table th {
+        background: #f8fafc; padding: 16px; text-align: right;
+        font-weight: 600; color: var(--gray-text); font-size: 0.85rem;
+        border-bottom: 1px solid var(--gray-border);
+    }
+    .custom-table td {
+        padding: 16px; border-bottom: 1px solid var(--gray-border);
+        vertical-align: middle; font-size: 0.95rem; transition: background 0.1s;
+    }
+    .custom-table tr:hover td { background: #fafafa; }
+    .custom-table tr:last-child td { border-bottom: none; }
+
+    /* Progress Bar */
+    .progress-mini {
+        height: 6px; width: 100px; background: #e2e8f0; border-radius: 10px; overflow: hidden; margin-top: 6px;
+    }
+    .progress-bar-mini { height: 100%; background: var(--brand); transition: width 0.3s; }
+
+    /* Avatar Group */
+    .avatar-circle {
+        width: 32px; height: 32px; border-radius: 50%;
+        background: #f1f5f9; color: var(--gray-text);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 0.75rem; font-weight: 700; border: 2px solid white;
+    }
+
+    /* Badges */
+    .badge-modern {
+        padding: 5px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 600;
+        display: inline-flex; align-items: center; gap: 4px;
+    }
+    .badge-pending { background: #fff7ed; color: #c2410c; }
+    .badge-progress { background: #eff6ff; color: #1d4ed8; }
+    .badge-completed { background: #f0fdf4; color: #15803d; }
+    .badge-overdue { background: #fef2f2; color: #b91c1c; }
+    .badge-priority-urgent { background: #fee2e2; color: #ef4444; }
+    .badge-priority-high { background: #ffedd5; color: #f97316; }
+
+    /* Custom Checkbox */
+    .check-custom {
+        width: 18px; height: 18px; border: 2px solid #cbd5e1;
+        border-radius: 4px; cursor: pointer; display: flex; align-items: center;
+        justify-content: center; transition: 0.2s;
+    }
+    .check-custom.checked { background: var(--brand); border-color: var(--brand); }
+    .check-custom.checked svg { display: block; }
+    .check-custom svg { display: none; color: white; width: 12px; height: 12px; }
+
+    /* Pagination */
+    .pagination { display: flex; justify-content: center; gap: 8px; margin-top: 24px; }
+    .page-btn {
+        width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+        background: white; border: 1px solid var(--gray-border); border-radius: 8px;
+        color: var(--dark); text-decoration: none; transition: 0.2s;
+    }
+    .page-btn.active { background: var(--brand); color: white; border-color: var(--brand); }
+    .page-btn:hover:not(.active) { border-color: var(--brand); color: var(--brand); }
+
+    /* Modal Styling */
+    .modal-content { border-radius: var(--radius-card); border: none; }
+    .modal-header { border-bottom: 1px solid var(--gray-border); padding: 20px; }
+    .modal-body { padding: 24px; }
+    .modal-footer { border-top: 1px solid var(--gray-border); padding: 16px 24px; }
+
+    /* Buttons */
+    .btn-icon { background: none; border: none; color: var(--gray-text); cursor: pointer; padding: 6px; border-radius: 6px; transition: 0.2s; }
+    .btn-icon:hover { background: #f1f5f9; color: var(--brand); }
+    .btn-icon.delete:hover { color: #ef4444; background: #fef2f2; }
+
+    .btn-primary-custom {
+        background: var(--brand); color: white; border: none; padding: 10px 20px;
+        border-radius: var(--radius-elem); font-weight: 600; text-decoration: none;
+        display: inline-flex; align-items: center; gap: 8px; transition: 0.2s; cursor: pointer;
+    }
+    .btn-primary-custom:hover { background: var(--brand-hover); }
+
+    .btn-outline-custom {
+        background: white; border: 1px solid var(--gray-border); color: var(--dark);
+        padding: 10px 16px; border-radius: var(--radius-elem); font-weight: 500;
+        text-decoration: none; display: inline-flex; align-items: center; gap: 8px; transition: 0.2s; cursor: pointer;
+    }
+    .btn-outline-custom:hover { border-color: var(--brand); color: var(--brand); }
+
+    @media (max-width: 768px) {
+        .filter-row { flex-direction: column; align-items: stretch; }
+        .stats-grid { grid-template-columns: 1fr 1fr; }
+        .table-responsive { overflow-x: auto; }
+    }
 </style>
 
-<!-- آمار کوتاه -->
-<div class="stats-row">
-    <div class="stat-card-mini">
-        <div class="stat-value"><?php echo number_format($stats['total']); ?></div>
-        <div class="stat-label">کل وظایف</div>
+<!-- ─── STATS DASHBOARD ───────────────────────────────────────────────────── -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-data">
+            <h3><?php echo number_format($stats['total']); ?></h3>
+            <p>کل وظایف سیستم</p>
+        </div>
+        <div class="stat-icon" style="background: #e0f2fe; color: #0369a1;">
+            <?php echo $icons['briefcase']; ?>
+        </div>
     </div>
-    <div class="stat-card-mini stat-warning">
-        <div class="stat-value"><?php echo number_format($stats['pending']); ?></div>
-        <div class="stat-label">در انتظار</div>
+    <div class="stat-card">
+        <div class="stat-data">
+            <h3><?php echo number_format($stats['my_pending']); ?></h3>
+            <p>وظایف باز من</p>
+        </div>
+        <div class="stat-icon" style="background: var(--brand-soft); color: var(--brand);">
+            <?php echo $icons['user']; ?>
+        </div>
     </div>
-    <div class="stat-card-mini stat-info">
-        <div class="stat-value"><?php echo number_format($stats['in_progress']); ?></div>
-        <div class="stat-label">در حال انجام</div>
+    <div class="stat-card">
+        <div class="stat-data">
+            <h3><?php echo number_format($stats['urgent']); ?></h3>
+            <p>اولویت فوری</p>
+        </div>
+        <div class="stat-icon" style="background: #ffedd5; color: #c2410c;">
+            <?php echo $icons['alert-circle']; ?>
+        </div>
     </div>
-    <div class="stat-card-mini stat-success">
-        <div class="stat-value"><?php echo number_format($stats['completed']); ?></div>
-        <div class="stat-label">تکمیل شده</div>
-    </div>
-    <div class="stat-card-mini stat-danger">
-        <div class="stat-value"><?php echo number_format($stats['overdue']); ?></div>
-        <div class="stat-label">عقب‌افتاده</div>
+    <div class="stat-card">
+        <div class="stat-data">
+            <h3><?php echo number_format($stats['overdue']); ?></h3>
+            <p>عقب افتاده</p>
+        </div>
+        <div class="stat-icon" style="background: #fee2e2; color: #b91c1c;">
+            <?php echo $icons['clock']; ?>
+        </div>
     </div>
 </div>
 
-<!-- Page Header -->
-<div class="page-header-tasks">
-    <div class="header-left">
-        <h4>مدیریت وظایف</h4>
-        <p>مشاهده و مدیریت وظایف و پیگیری‌ها</p>
+<!-- ─── HEADER & ACTIONS ──────────────────────────────────────────────────── -->
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+    <div>
+        <h4 class="mb-1 fw-bold">مدیریت وظایف</h4>
+        <p class="text-muted small mb-0">سازماندهی و پیگیری فعالیت‌های تیمی</p>
     </div>
-
-    <div class="header-right">
-        <?php if (hasPermission('add_task')): ?>
-            <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#quickAddModal">
-                <i class="fas fa-plus-circle me-2"></i>
-                افزودن سریع
+    <div class="d-flex gap-2">
+        <form method="POST" id="exportForm">
+            <input type="hidden" name="action" value="export">
+            <input type="hidden" name="csrf_token" value="<?php echo $csrf_token; ?>">
+            <!-- Include current filters in export (simplified) -->
+            <button type="submit" class="btn-outline-custom">
+                <?php echo $icons['download']; ?> خروجی اکسل
             </button>
-            <a href="task_form.php" class="btn btn-primary">
-                <i class="fas fa-plus me-2"></i>
-                افزودن وظیفه جدید
+        </form>
+        <?php if (hasPermission('add_task')): ?>
+            <button type="button" class="btn-outline-custom" data-bs-toggle="modal" data-bs-target="#quickAddModal">
+                <?php echo $icons['plus']; ?> سریع
+            </button>
+            <a href="task_form.php" class="btn-primary-custom">
+                <?php echo $icons['plus']; ?> وظیفه جدید
             </a>
         <?php endif; ?>
     </div>
 </div>
 
-<!-- فیلترها -->
+<!-- ─── FILTERS ───────────────────────────────────────────────────────────── -->
 <div class="filter-card">
-    <form method="GET" class="row g-3 align-items-end">
-        <div class="col-lg-3 col-md-6 col-12">
-            <label class="form-label">جستجو</label>
-            <input type="text" class="form-control" name="search" value="<?php echo htmlspecialchars($search); ?>" placeholder="عنوان، توضیحات...">
+    <form method="GET" class="filter-row">
+        <div class="search-wrapper">
+            <span class="search-icon"><?php echo $icons['search']; ?></span>
+            <input type="text" name="search" class="form-control-custom" placeholder="جستجو در عنوان، توضیحات..." value="<?php echo htmlspecialchars($search); ?>">
         </div>
+        
+        <select name="date_filter" class="form-select-custom">
+            <option value="">همه زمان‌ها</option>
+            <option value="today" <?php echo $date_filter === 'today' ? 'selected' : ''; ?>>امروز</option>
+            <option value="week" <?php echo $date_filter === 'week' ? 'selected' : ''; ?>>این هفته</option>
+            <option value="overdue" <?php echo $date_filter === 'overdue' ? 'selected' : ''; ?>>عقب افتاده</option>
+            <option value="my_tasks" <?php echo $date_filter === 'my_tasks' ? 'selected' : ''; ?>>وظایف من</option>
+        </select>
 
-        <div class="col-lg-2 col-md-6 col-12">
-            <label class="form-label">وضعیت</label>
-            <select class="form-select" name="status">
-                <option value="">همه</option>
-                <option value="pending" <?php echo $status === 'pending' ? 'selected' : ''; ?>>در انتظار</option>
-                <option value="in_progress" <?php echo $status === 'in_progress' ? 'selected' : ''; ?>>در حال انجام</option>
-                <option value="completed" <?php echo $status === 'completed' ? 'selected' : ''; ?>>تکمیل شده</option>
-                <option value="cancelled" <?php echo $status === 'cancelled' ? 'selected' : ''; ?>>لغو شده</option>
-            </select>
-        </div>
+        <select name="status" class="form-select-custom">
+            <option value="">همه وضعیت‌ها</option>
+            <option value="pending" <?php echo $status === 'pending' ? 'selected' : ''; ?>>در انتظار</option>
+            <option value="in_progress" <?php echo $status === 'in_progress' ? 'selected' : ''; ?>>در حال انجام</option>
+            <option value="completed" <?php echo $status === 'completed' ? 'selected' : ''; ?>>تکمیل شده</option>
+        </select>
 
-        <div class="col-lg-2 col-md-6 col-12">
-            <label class="form-label">اولویت</label>
-            <select class="form-select" name="priority">
-                <option value="">همه</option>
-                <option value="urgent" <?php echo $priority === 'urgent' ? 'selected' : ''; ?>>فوری</option>
-                <option value="high" <?php echo $priority === 'high' ? 'selected' : ''; ?>>بالا</option>
-                <option value="medium" <?php echo $priority === 'medium' ? 'selected' : ''; ?>>متوسط</option>
-                <option value="low" <?php echo $priority === 'low' ? 'selected' : ''; ?>>کم</option>
-            </select>
-        </div>
+        <select name="assigned_to" class="form-select-custom">
+            <option value="">همه کاربران</option>
+            <?php foreach ($users as $u): ?>
+                <option value="<?php echo $u['id']; ?>" <?php echo $assigned_to == $u['id'] ? 'selected' : ''; ?>>
+                    <?php echo htmlspecialchars($u['first_name'] . ' ' . $u['last_name']); ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
 
-        <div class="col-lg-2 col-md-6 col-12">
-            <label class="form-label">نوع</label>
-            <select class="form-select" name="type">
-                <option value="">همه</option>
-                <option value="call" <?php echo $type === 'call' ? 'selected' : ''; ?>>تماس</option>
-                <option value="email" <?php echo $type === 'email' ? 'selected' : ''; ?>>ایمیل</option>
-                <option value="meeting" <?php echo $type === 'meeting' ? 'selected' : ''; ?>>جلسه</option>
-                <option value="follow_up" <?php echo $type === 'follow_up' ? 'selected' : ''; ?>>پیگیری</option>
-                <option value="other" <?php echo $type === 'other' ? 'selected' : ''; ?>>سایر</option>
-            </select>
-        </div>
+        <select name="sort" class="form-select-custom">
+            <option value="newest" <?php echo $sort === 'newest' ? 'selected' : ''; ?>>جدیدترین</option>
+            <option value="oldest" <?php echo $sort === 'oldest' ? 'selected' : ''; ?>>قدیمی‌ترین</option>
+            <option value="due_asc" <?php echo $sort === 'due_asc' ? 'selected' : ''; ?>>نزدیک‌ترین سررسید</option>
+            <option value="priority" <?php echo $sort === 'priority' ? 'selected' : ''; ?>>اولویت بالا</option>
+        </select>
 
-        <div class="col-lg-2 col-md-6 col-12">
-            <label class="form-label">سررسید</label>
-            <select class="form-select" name="due_filter">
-                <option value="">همه</option>
-                <option value="today" <?php echo $due_filter === 'today' ? 'selected' : ''; ?>>امروز</option>
-                <option value="tomorrow" <?php echo $due_filter === 'tomorrow' ? 'selected' : ''; ?>>فردا</option>
-                <option value="this_week" <?php echo $due_filter === 'this_week' ? 'selected' : ''; ?>>این هفته</option>
-                <option value="overdue" <?php echo $due_filter === 'overdue' ? 'selected' : ''; ?>>عقب‌افتاده</option>
-            </select>
-        </div>
-
-        <div class="col-lg-1 col-md-12 col-12">
-            <label class="form-label d-none d-lg-block">&nbsp;</label>
-            <div class="d-grid">
-                <button type="submit" class="btn btn-outline-primary">
-                    <i class="fas fa-search me-1"></i>
-                    <span class="d-lg-none">جستجو</span>
-                </button>
-            </div>
-        </div>
+        <button type="submit" class="btn-primary-custom" style="min-width: 100px; justify-content: center;">
+            <?php echo $icons['filter']; ?> فیلتر
+        </button>
+        <?php if($search || $status || $priority || $assigned_to || $date_filter): ?>
+            <a href="tasks.php" class="btn-outline-custom text-danger border-danger">حذف فیلتر</a>
+        <?php endif; ?>
     </form>
 </div>
 
-<!-- جدول وظایف -->
-<div class="tasks-table-card">
-    <div class="card-header">
-        <h5>
-            <i class="fas fa-tasks"></i>
-            لیست وظایف
-            <span class="badge"><?php echo number_format($total_records); ?></span>
-        </h5>
-
-        <div class="btn-group" role="group">
-            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="exportTableToCSV('tasksTable', 'tasks.csv')">
-                <i class="fas fa-download me-1"></i>
-                خروجی CSV
+<!-- ─── BULK ACTIONS ──────────────────────────────────────────────────────── -->
+<div class="bulk-actions" id="bulkActionsBar">
+    <div class="d-flex align-items-center gap-3">
+        <span class="fw-bold"><span id="selectedCount">0</span> وظیفه انتخاب شده</span>
+        <div class="vr" style="background: rgba(255,255,255,0.3); height: 20px;"></div>
+        
+        <form method="POST" id="bulkDeleteForm" style="display:inline;">
+            <input type="hidden" name="action" value="bulk_delete">
+            <input type="hidden" name="csrf_token" value="<?php echo $csrf_token; ?>">
+            <input type="hidden" name="task_ids" id="bulkDeleteIds">
+            <button type="button" onclick="confirmBulkDelete()" class="btn text-white btn-sm p-0 d-flex align-items-center gap-1">
+                <?php echo $icons['trash']; ?> حذف گروهی
             </button>
-        </div>
+        </form>
     </div>
+    
+    <div class="d-flex align-items-center gap-2">
+        <span class="small opacity-75">تغییر وضعیت به:</span>
+        <form method="POST" id="bulkStatusForm" class="d-flex gap-1">
+            <input type="hidden" name="action" value="bulk_status">
+            <input type="hidden" name="csrf_token" value="<?php echo $csrf_token; ?>">
+            <input type="hidden" name="task_ids" id="bulkStatusIds">
+            
+            <button type="submit" name="new_status" value="completed" class="btn btn-sm btn-light text-success border-0">تکمیل</button>
+            <button type="submit" name="new_status" value="in_progress" class="btn btn-sm btn-light text-primary border-0">در حال انجام</button>
+        </form>
+    </div>
+</div>
 
+<!-- ─── TASKS TABLE ───────────────────────────────────────────────────────── -->
+<div class="table-card">
     <div class="table-responsive">
-        <?php if (count($tasks) > 0): ?>
-            <table class="table-modern" id="tasksTable">
-                <thead>
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th style="width: 40px;">
+                        <div class="check-custom" id="checkAll" onclick="toggleAllCheckboxes()">
+                            <?php echo $icons['check']; ?>
+                        </div>
+                    </th>
+                    <th style="min-width: 250px;">عنوان و پیشرفت</th>
+                    <th>وضعیت</th>
+                    <th>اولویت</th>
+                    <th>سررسید</th>
+                    <th>مسئول</th>
+                    <th>مرتبط با</th>
+                    <th class="text-center">عملیات</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (empty($tasks)): ?>
                     <tr>
-                        <th>عنوان وظیفه</th>
-                        <th>وضعیت</th>
-                        <th>اولویت</th>
-                        <th>نوع</th>
-                        <th>سررسید</th>
-                        <th>مسئول</th>
-                        <th>عملیات</th>
+                        <td colspan="8" class="text-center py-5">
+                            <div class="opacity-50 mb-3" style="color: var(--gray-text);">
+                                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="9" y1="15" x2="15" y2="15"></line></svg>
+                            </div>
+                            <p class="text-muted">هیچ وظیفه‌ای یافت نشد.</p>
+                        </td>
                     </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($tasks as $task):
-                        // محاسبه وضعیت سررسید
-                        $is_overdue = false;
-                        if ($task['due_date'] && strtotime($task['due_date']) < time() && $task['status'] !== 'completed') {
-                            $is_overdue = true;
-                        }
-
-                        // ترجمه وضعیت
-                        $status_labels = [
-                            'pending' => 'در انتظار',
-                            'in_progress' => 'در حال انجام',
-                            'completed' => 'تکمیل شده',
-                            'cancelled' => 'لغو شده'
-                        ];
-
-                        // ترجمه اولویت
-                        $priority_labels = [
-                            'urgent' => 'فوری',
-                            'high' => 'بالا',
-                            'medium' => 'متوسط',
-                            'low' => 'کم'
-                        ];
-
-                        // ترجمه نوع
-                        $type_labels = [
-                            'call' => 'تماس',
-                            'email' => 'ایمیل',
-                            'meeting' => 'جلسه',
-                            'follow_up' => 'پیگیری',
-                            'other' => 'سایر'
-                        ];
+                <?php else: ?>
+                    <?php foreach ($tasks as $task): 
+                        $is_overdue = $task['due_date'] && strtotime($task['due_date']) < time() && $task['status'] !== 'completed';
+                        $progress_pct = $task['total_subs'] > 0 ? round(($task['done_subs'] / $task['total_subs']) * 100) : ($task['status'] === 'completed' ? 100 : 0);
                     ?>
                         <tr>
                             <td>
-                                <div class="task-title-cell">
-                                    <div class="task-main-title">
-                                        <?php echo htmlspecialchars($task['title']); ?>
-                                    </div>
-                                    <?php if ($task['related_name']): ?>
-                                        <div class="task-subtitle">
-                                            <i class="fas fa-link"></i>
-                                            <?php echo htmlspecialchars($task['related_name']); ?>
-                                        </div>
-                                    <?php endif; ?>
+                                <div class="check-custom task-checkbox" data-id="<?php echo $task['id']; ?>" onclick="toggleRowCheckbox(this)">
+                                    <?php echo $icons['check']; ?>
                                 </div>
                             </td>
                             <td>
-                                <span class="status-badge status-<?php echo $task['status']; ?>">
-                                    <?php echo $status_labels[$task['status']] ?? $task['status']; ?>
+                                <a href="task_view.php?id=<?php echo $task['id']; ?>" class="d-block text-dark fw-bold text-decoration-none mb-1">
+                                    <?php echo htmlspecialchars($task['title']); ?>
+                                </a>
+                                <?php if ($task['total_subs'] > 0): ?>
+                                    <div class="d-flex align-items-center gap-2 small text-muted">
+                                        <div class="progress-mini flex-grow-1" style="max-width: 60px;">
+                                            <div class="progress-bar-mini" style="width: <?php echo $progress_pct; ?>%"></div>
+                                        </div>
+                                        <span style="font-size: 0.75rem;"><?php echo $task['done_subs'].'/'.$task['total_subs']; ?></span>
+                                    </div>
+                                <?php else: ?>
+                                    <span class="small text-muted" style="font-size: 0.8rem;">بدون چک‌لیست</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <span class="badge-modern badge-<?php echo $task['status']; ?>">
+                                    <?php echo getStatusTitle($task['status'], 'task'); ?>
                                 </span>
                             </td>
                             <td>
-                                <span class="priority-badge priority-<?php echo $task['priority']; ?>">
-                                    <?php if ($task['priority'] === 'urgent'): ?>
-                                        <i class="fas fa-exclamation-triangle"></i>
-                                    <?php elseif ($task['priority'] === 'high'): ?>
-                                        <i class="fas fa-arrow-up"></i>
-                                    <?php elseif ($task['priority'] === 'medium'): ?>
-                                        <i class="fas fa-minus"></i>
-                                    <?php else: ?>
-                                        <i class="fas fa-arrow-down"></i>
-                                    <?php endif; ?>
-                                    <?php echo $priority_labels[$task['priority']] ?? $task['priority']; ?>
-                                </span>
-                            </td>
-                            <td>
-                                <span class="type-badge">
-                                    <?php
-                                    $type_icons = [
-                                        'call' => 'fa-phone',
-                                        'email' => 'fa-envelope',
-                                        'meeting' => 'fa-users',
-                                        'follow_up' => 'fa-redo',
-                                        'other' => 'fa-circle'
-                                    ];
-                                    ?>
-                                    <i class="fas <?php echo $type_icons[$task['type']] ?? 'fa-circle'; ?>"></i>
-                                    <?php echo $type_labels[$task['type']] ?? $task['type']; ?>
-                                </span>
+                                <?php if($task['priority'] === 'urgent' || $task['priority'] === 'high'): ?>
+                                    <span class="badge-modern badge-priority-<?php echo $task['priority']; ?>">
+                                        <?php echo getPriorityTitle($task['priority']); ?>
+                                    </span>
+                                <?php else: ?>
+                                    <span class="text-muted small"><?php echo getPriorityTitle($task['priority']); ?></span>
+                                <?php endif; ?>
                             </td>
                             <td>
                                 <?php if ($task['due_date']): ?>
-                                    <div class="due-date-cell <?php echo $is_overdue ? 'overdue' : ''; ?>">
-                                        <div class="due-date-main">
-                                            <?php echo jdate('Y/m/d', strtotime($task['due_date'])); ?>
-                                        </div>
-                                        <div class="due-date-sub">
-                                            <?php echo jdate('H:i', strtotime($task['due_date'])); ?>
-                                        </div>
+                                    <div class="d-flex align-items-center gap-1 <?php echo $is_overdue ? 'badge-modern badge-overdue' : 'text-muted small'; ?>">
+                                        <?php if($is_overdue) echo $icons['alert-circle']; ?>
+                                        <?php echo formatPersianDate($task['due_date'], 'Y/m/d'); ?>
                                     </div>
                                 <?php else: ?>
-                                    <span class="text-muted" style="font-size: 0.85rem;">—</span>
+                                    <span class="text-muted small">-</span>
                                 <?php endif; ?>
                             </td>
                             <td>
-                                <?php if ($task['assigned_user']): ?>
+                                <?php if ($task['assignee_name']): ?>
                                     <div class="d-flex align-items-center gap-2">
-                                        <div class="user-avatar-mini">
-                                            <?php
-                                            $names = explode(' ', $task['assigned_user']);
-                                            echo mb_substr($names[0], 0, 1);
-                                            if (isset($names[1])) echo mb_substr($names[1], 0, 1);
-                                            ?>
+                                        <div class="avatar-circle" title="<?php echo htmlspecialchars($task['assignee_name']); ?>">
+                                            <?php echo mb_substr($task['assignee_name'], 0, 1); ?>
                                         </div>
-                                        <span style="font-size: 0.85rem;">
-                                            <?php echo htmlspecialchars($task['assigned_user']); ?>
-                                        </span>
+                                        <span class="d-none d-lg-block small"><?php echo htmlspecialchars($task['assignee_name']); ?></span>
                                     </div>
                                 <?php else: ?>
-                                    <span class="text-muted" style="font-size: 0.85rem;">بدون مسئول</span>
+                                    <span class="text-muted small">---</span>
                                 <?php endif; ?>
                             </td>
                             <td>
-                                <div class="action-buttons">
-                                    <a href="task_view.php?id=<?php echo $task['id']; ?>"
-                                       class="btn btn-outline-info btn-sm"
-                                       data-bs-toggle="tooltip" title="مشاهده">
-                                        <i class="fas fa-eye"></i>
+                                <?php if ($task['related_name']): ?>
+                                    <a href="<?php echo $task['related_type']; ?>_view.php?id=<?php echo $task['related_id']; ?>" class="badge-modern" style="background: #f1f5f9; color: var(--dark); text-decoration: none;">
+                                        <?php echo $task['related_type'] === 'customer' ? 'مشتری' : 'لید'; ?>
                                     </a>
-
+                                <?php else: ?>
+                                    <span class="text-muted small">-</span>
+                                <?php endif; ?>
+                            </td>
+                            <td class="text-center">
+                                <div class="d-flex justify-content-center gap-1">
+                                    <a href="task_view.php?id=<?php echo $task['id']; ?>" class="btn-icon" title="مشاهده">
+                                        <?php echo $icons['eye']; ?>
+                                    </a>
                                     <?php if (hasPermission('edit_task')): ?>
-                                        <a href="task_form.php?id=<?php echo $task['id']; ?>"
-                                           class="btn btn-outline-warning btn-sm"
-                                           data-bs-toggle="tooltip" title="ویرایش">
-                                            <i class="fas fa-edit"></i>
+                                        <a href="task_form.php?id=<?php echo $task['id']; ?>" class="btn-icon" title="ویرایش">
+                                            <?php echo $icons['edit']; ?>
                                         </a>
                                     <?php endif; ?>
-
                                     <?php if (hasPermission('delete_task')): ?>
-                                        <button type="button"
-                                                class="btn btn-outline-danger btn-sm"
-                                                onclick="deleteTask(<?php echo $task['id']; ?>, '<?php echo htmlspecialchars($task['title']); ?>')"
-                                                data-bs-toggle="tooltip" title="حذف">
-                                            <i class="fas fa-trash"></i>
+                                        <button onclick="confirmDelete(<?php echo $task['id']; ?>)" class="btn-icon delete" title="حذف">
+                                            <?php echo $icons['trash']; ?>
                                         </button>
                                     <?php endif; ?>
                                 </div>
                             </td>
                         </tr>
                     <?php endforeach; ?>
-                </tbody>
-            </table>
-        <?php else: ?>
-            <div class="empty-state-tasks">
-                <i class="fas fa-inbox"></i>
-                <h5>هیچ وظیفه‌ای یافت نشد</h5>
-                <p>با استفاده از فیلترها جستجوی دیگری انجام دهید یا وظیفه جدیدی اضافه کنید</p>
-            </div>
-        <?php endif; ?>
+                <?php endif; ?>
+            </tbody>
+        </table>
     </div>
-
-    <!-- صفحه‌بندی -->
-    <?php if ($total_records > $per_page): ?>
-        <div class="pagination-wrapper">
-            <div class="pagination-info">
-                نمایش <?php echo number_format($offset + 1); ?> تا <?php echo number_format(min($offset + $per_page, $total_records)); ?>
-                از <?php echo number_format($total_records); ?> رکورد
-            </div>
-
-            <?php
-            $base_url = 'tasks.php?' . http_build_query(array_filter([
-                'search' => $search,
-                'status' => $status,
-                'priority' => $priority,
-                'type' => $type,
-                'assigned_to' => $assigned_to,
-                'due_filter' => $due_filter
-            ]));
-            echo createPagination($page, $total_records, $per_page, $base_url);
-            ?>
-        </div>
-    <?php endif; ?>
 </div>
 
-<!-- Modal افزودن سریع -->
-<?php if (hasPermission('add_task')): ?>
+<!-- PAGINATION -->
+<?php if ($total_pages > 1): ?>
+    <div class="pagination">
+        <?php for ($i = 1; $i <= $total_pages; $i++): ?>
+            <a href="?page=<?php echo $i; ?>&search=<?php echo $search; ?>&status=<?php echo $status; ?>&sort=<?php echo $sort; ?>" 
+               class="page-btn <?php echo $i === $page ? 'active' : ''; ?>">
+                <?php echo $i; ?>
+            </a>
+        <?php endfor; ?>
+    </div>
+<?php endif; ?>
+
+<!-- ─── QUICK ADD MODAL ───────────────────────────────────────────────────── -->
 <div class="modal fade" id="quickAddModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">افزودن سریع وظیفه</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
             <form method="POST">
+                <input type="hidden" name="csrf_token" value="<?php echo $csrf_token; ?>">
+                <input type="hidden" name="action" value="quick_add">
+                
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold">افزودن سریع وظیفه</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
                 <div class="modal-body">
-                    <input type="hidden" name="action" value="quick_add">
-                    <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
-
                     <div class="mb-3">
-                        <label for="quick_title" class="form-label">عنوان وظیفه <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="quick_title" name="quick_title" required>
+                        <label class="form-label text-muted small fw-bold">عنوان وظیفه</label>
+                        <input type="text" name="quick_title" class="form-control-custom" required placeholder="مثال: تماس با مشتری...">
                     </div>
-
                     <div class="mb-3">
-                        <label for="quick_due_date" class="form-label">سررسید</label>
-                        <input type="datetime-local" class="form-control" id="quick_due_date" name="quick_due_date">
+                        <label class="form-label text-muted small fw-bold">سررسید</label>
+                        <input type="datetime-local" name="quick_due_date" class="form-control-custom">
                     </div>
-
                     <div class="mb-3">
-                        <label for="quick_assigned_to" class="form-label">مسئول</label>
-                        <select class="form-select" id="quick_assigned_to" name="quick_assigned_to">
-                            <option value="">بدون مسئول</option>
-                            <?php foreach ($users as $user): ?>
-                                <option value="<?php echo $user['id']; ?>">
-                                    <?php echo htmlspecialchars($user['first_name'] . ' ' . $user['last_name']); ?>
-                                </option>
+                        <label class="form-label text-muted small fw-bold">مسئول انجام</label>
+                        <select name="quick_assigned_to" class="form-select-custom w-100">
+                            <option value="">خودم</option>
+                            <?php foreach ($users as $u): ?>
+                                <option value="<?php echo $u['id']; ?>"><?php echo htmlspecialchars($u['first_name'] . ' ' . $u['last_name']); ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">انصراف</button>
-                    <button type="submit" class="btn btn-primary">افزودن</button>
+                    <button type="button" class="btn-outline-custom" data-bs-dismiss="modal">انصراف</button>
+                    <button type="submit" class="btn-primary-custom">ذخیره وظیفه</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
-<?php endif; ?>
 
+<!-- ─── SCRIPTS ───────────────────────────────────────────────────────────── -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-function deleteTask(taskId, taskTitle) {
-    confirmDelete(`آیا از حذف وظیفه "${taskTitle}" مطمئن هستید؟`).then((confirmed) => {
-        if (confirmed) {
-            const form = document.createElement('form');
-            form.method = 'POST';
-            form.innerHTML = `
-                <input type="hidden" name="action" value="delete">
-                <input type="hidden" name="task_id" value="${taskId}">
-                <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
-            `;
-            document.body.appendChild(form);
-            form.submit();
-        }
-    });
-}
-
-function updateTaskStatus(taskId, newStatus) {
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.innerHTML = `
-        <input type="hidden" name="action" value="update_status">
-        <input type="hidden" name="task_id" value="${taskId}">
-        <input type="hidden" name="new_status" value="${newStatus}">
-        <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
-    `;
-    document.body.appendChild(form);
-    form.submit();
-}
-
-// Initialize table sorting
-document.addEventListener('DOMContentLoaded', function() {
-    initTableSort('tasksTable');
-
-    // Set default due date to tomorrow
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(9, 0, 0, 0);
-    const quickDueInput = document.getElementById('quick_due_date');
-    if (quickDueInput) {
-        quickDueInput.value = tomorrow.toISOString().slice(0, 16);
+    // Delete Confirmation
+    function confirmDelete(id) {
+        Swal.fire({
+            title: 'حذف وظیفه',
+            text: "آیا از حذف این مورد اطمینان دارید؟",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            confirmButtonText: 'بله، حذف کن',
+            cancelButtonText: 'لغو'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.innerHTML = `<input type="hidden" name="action" value="delete"><input type="hidden" name="task_id" value="${id}"><input type="hidden" name="csrf_token" value="<?php echo $csrf_token; ?>">`;
+                document.body.appendChild(form);
+                form.submit();
+            }
+        });
     }
-});
+
+    // Bulk Action Logic
+    let selectedIds = [];
+    const bulkBar = document.getElementById('bulkActionsBar');
+    const countSpan = document.getElementById('selectedCount');
+
+    function toggleRowCheckbox(el) {
+        el.classList.toggle('checked');
+        const id = el.dataset.id;
+        if (el.classList.contains('checked')) {
+            selectedIds.push(id);
+        } else {
+            selectedIds = selectedIds.filter(item => item !== id);
+        }
+        updateBulkUI();
+    }
+
+    function toggleAllCheckboxes() {
+        const master = document.getElementById('checkAll');
+        master.classList.toggle('checked');
+        const isChecked = master.classList.contains('checked');
+        
+        const boxes = document.querySelectorAll('.task-checkbox');
+        selectedIds = [];
+        
+        boxes.forEach(box => {
+            if(isChecked) {
+                box.classList.add('checked');
+                selectedIds.push(box.dataset.id);
+            } else {
+                box.classList.remove('checked');
+            }
+        });
+        updateBulkUI();
+    }
+
+    function updateBulkUI() {
+        countSpan.innerText = selectedIds.length;
+        if(selectedIds.length > 0) {
+            bulkBar.style.display = 'flex';
+            document.getElementById('bulkDeleteIds').value = selectedIds.join(',');
+            document.getElementById('bulkStatusIds').value = selectedIds.join(',');
+        } else {
+            bulkBar.style.display = 'none';
+        }
+    }
+
+    function confirmBulkDelete() {
+        Swal.fire({
+            title: 'حذف گروهی',
+            text: `آیا مطمئن هستید که می‌خواهید ${selectedIds.length} وظیفه را حذف کنید؟`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            confirmButtonText: 'بله، حذف همه',
+            cancelButtonText: 'لغو'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                document.getElementById('bulkDeleteForm').submit();
+            }
+        });
+    }
 </script>
 
 <?php include __DIR__ . '/../private/footer.php'; ?>
