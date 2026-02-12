@@ -1,20 +1,21 @@
 <?php
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 if (!isset($_SESSION['user_id'])) {
     header('Location: login.php');
     exit();
 }
 
-// دریافت اطلاعات کاربر
 $user_id = $_SESSION['user_id'];
 $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
 $stmt->execute([$user_id]);
 $current_user = $stmt->fetch();
 
-// دریافت نام کامل کاربر
 $user_full_name = trim($current_user['first_name'] . ' ' . $current_user['last_name']) ?: $current_user['username'];
 $user_role = $current_user['role'];
 
-// تبدیل نقش به فارسی
 $role_names = [
     'admin' => 'مدیر سیستم',
     'manager' => 'مدیر',
@@ -30,20 +31,11 @@ $user_role_fa = $role_names[$user_role] ?? 'کاربر';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#00b0a4">
     <title><?php echo $page_title ?? 'داشبورد'; ?> - سیستم CRM | ردی استودیو</title>
-    
-    <!-- Favicon -->
     <link rel="icon" type="image/png" href="../assets/favicon.png">
     <link rel="apple-touch-icon" href="../assets/favicon.png">
-    
-    <!-- Bootstrap RTL -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
-    
-    <!-- Font Awesome -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    
-    <!-- Custom Styles -->
     <style>
-        /* ==================== FONT FACE ==================== */
         @font-face {
             font-family: 'YekanBakh';
             src: url('../assets/YekanBakhFaNum-VF.ttf') format('truetype-variations');
@@ -51,20 +43,14 @@ $user_role_fa = $role_names[$user_role] ?? 'کاربر';
             font-display: swap;
         }
 
-        /* ==================== CSS VARIABLES ==================== */
         :root {
-            /* Brand Colors */
             --brand-primary: #00b0a4;
             --brand-primary-dark: #008c82;
             --brand-primary-light: #00d4c5;
             --brand-black: #000000;
-            
-            /* Gradient */
             --gradient-primary: linear-gradient(135deg, #00b0a4 0%, #00d4c5 100%);
             --gradient-dark: linear-gradient(135deg, #000000 0%, #1a1a1a 100%);
             --gradient-overlay: linear-gradient(135deg, rgba(0,176,164,0.1) 0%, rgba(0,212,197,0.05) 100%);
-            
-            /* Neutral Colors */
             --gray-50: #fafafa;
             --gray-100: #f5f5f5;
             --gray-200: #eeeeee;
@@ -75,8 +61,6 @@ $user_role_fa = $role_names[$user_role] ?? 'کاربر';
             --gray-700: #616161;
             --gray-800: #424242;
             --gray-900: #212121;
-            
-            /* Semantic Colors */
             --success: #00c853;
             --success-light: #69f0ae;
             --warning: #ffc107;
@@ -85,8 +69,6 @@ $user_role_fa = $role_names[$user_role] ?? 'کاربر';
             --danger-light: #ef5350;
             --info: #2196f3;
             --info-light: #64b5f6;
-            
-            /* Shadows - Modern 2026 */
             --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
             --shadow-sm: 0 2px 4px 0 rgba(0, 0, 0, 0.04);
             --shadow-md: 0 4px 8px 0 rgba(0, 0, 0, 0.06);
@@ -94,8 +76,6 @@ $user_role_fa = $role_names[$user_role] ?? 'کاربر';
             --shadow-xl: 0 12px 24px 0 rgba(0, 0, 0, 0.1);
             --shadow-2xl: 0 16px 32px 0 rgba(0, 0, 0, 0.12);
             --shadow-brand: 0 8px 24px 0 rgba(0, 176, 164, 0.2);
-            
-            /* Border Radius - Modern Curves */
             --radius-xs: 8px;
             --radius-sm: 12px;
             --radius-md: 16px;
@@ -103,26 +83,19 @@ $user_role_fa = $role_names[$user_role] ?? 'کاربر';
             --radius-xl: 24px;
             --radius-2xl: 32px;
             --radius-full: 9999px;
-            
-            /* Spacing */
             --spacing-xs: 0.5rem;
             --spacing-sm: 0.75rem;
             --spacing-md: 1rem;
             --spacing-lg: 1.5rem;
             --spacing-xl: 2rem;
             --spacing-2xl: 3rem;
-            
-            /* Transitions - Smooth & Fast */
             --transition-fast: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
             --transition-base: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
             --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            
-            /* Layout */
             --sidebar-width: 280px;
             --header-height: 72px;
         }
 
-        /* ==================== RESET & BASE ==================== */
         * {
             margin: 0;
             padding: 0;
@@ -144,13 +117,11 @@ $user_role_fa = $role_names[$user_role] ?? 'کاربر';
             scroll-behavior: smooth;
         }
 
-        /* ==================== LAYOUT ==================== */
         .app-wrapper {
             display: flex;
             min-height: 100vh;
         }
 
-        /* ==================== SIDEBAR ==================== */
         .sidebar {
             width: var(--sidebar-width);
             background: linear-gradient(180deg, var(--brand-black) 0%, #1a1a1a 100%);
@@ -178,7 +149,6 @@ $user_role_fa = $role_names[$user_role] ?? 'کاربر';
             border-radius: var(--radius-full);
         }
 
-        /* Sidebar Header */
         .sidebar-header {
             padding: 1.5rem;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
@@ -230,7 +200,6 @@ $user_role_fa = $role_names[$user_role] ?? 'کاربر';
             font-weight: 400;
         }
 
-        /* Sidebar Navigation */
         .sidebar-nav {
             padding: 1rem 0;
         }
@@ -318,7 +287,6 @@ $user_role_fa = $role_names[$user_role] ?? 'کاربر';
             text-align: center;
         }
 
-        /* Sidebar Footer */
         .sidebar-footer {
             padding: 1.5rem;
             border-top: 1px solid rgba(255, 255, 255, 0.1);
@@ -347,7 +315,6 @@ $user_role_fa = $role_names[$user_role] ?? 'کاربر';
             color: var(--brand-primary);
         }
 
-        /* ==================== MAIN CONTENT ==================== */
         .main-content {
             margin-right: var(--sidebar-width);
             width: calc(100% - var(--sidebar-width));
@@ -355,7 +322,6 @@ $user_role_fa = $role_names[$user_role] ?? 'کاربر';
             transition: var(--transition-smooth);
         }
 
-        /* Top Header */
         .top-header {
             height: var(--header-height);
             background: white;
@@ -408,7 +374,6 @@ $user_role_fa = $role_names[$user_role] ?? 'کاربر';
             gap: 1rem;
         }
 
-        /* User Dropdown */
         .user-dropdown {
             position: relative;
         }
@@ -526,12 +491,45 @@ $user_role_fa = $role_names[$user_role] ?? 'کاربر';
             color: var(--danger);
         }
 
-        /* Content Area */
         .content-wrapper {
             padding: 2rem;
         }
 
-        /* ==================== RESPONSIVE ==================== */
+        .mobile-menu-toggle {
+            display: none;
+            width: 40px;
+            height: 40px;
+            border-radius: var(--radius-sm);
+            background: var(--gray-100);
+            border: none;
+            color: var(--gray-700);
+            font-size: 1.25rem;
+            cursor: pointer;
+            transition: var(--transition-base);
+        }
+
+        .mobile-menu-toggle:hover {
+            background: var(--brand-primary);
+            color: white;
+        }
+
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .sidebar-overlay.show {
+            opacity: 1;
+        }
+
         @media (max-width: 992px) {
             .sidebar {
                 transform: translateX(100%);
@@ -550,6 +548,10 @@ $user_role_fa = $role_names[$user_role] ?? 'کاربر';
                 display: block;
             }
 
+            .sidebar-overlay {
+                display: block;
+            }
+
             .top-header {
                 padding: 0 1rem;
             }
@@ -557,33 +559,40 @@ $user_role_fa = $role_names[$user_role] ?? 'کاربر';
             .content-wrapper {
                 padding: 1rem;
             }
+
+            .user-info {
+                display: none;
+            }
+
+            .user-trigger {
+                padding: 0.5rem;
+            }
+
+            .page-title-wrapper h2 {
+                font-size: 1.125rem;
+            }
+
+            .breadcrumb-wrapper {
+                display: none;
+            }
         }
 
-        /* Mobile Menu Toggle */
-        .mobile-menu-toggle {
-            display: none;
-            width: 40px;
-            height: 40px;
-            border-radius: var(--radius-sm);
-            background: var(--gray-100);
-            border: none;
-            color: var(--gray-700);
-            font-size: 1.25rem;
-            cursor: pointer;
-            transition: var(--transition-base);
-        }
+        @media (max-width: 576px) {
+            .header-left {
+                gap: 0.75rem;
+            }
 
-        .mobile-menu-toggle:hover {
-            background: var(--brand-primary);
-            color: white;
+            .page-title-wrapper h2 {
+                font-size: 1rem;
+            }
         }
     </style>
 </head>
 <body>
     <div class="app-wrapper">
-        <!-- Sidebar -->
+        <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
         <aside class="sidebar" id="sidebar">
-            <!-- Sidebar Header -->
             <div class="sidebar-header">
                 <a href="dashboard.php" class="sidebar-brand">
                     <div class="sidebar-logo">
@@ -596,7 +605,6 @@ $user_role_fa = $role_names[$user_role] ?? 'کاربر';
                 </a>
             </div>
 
-            <!-- Sidebar Navigation -->
             <nav class="sidebar-nav">
                 <div class="nav-section">
                     <div class="nav-section-title">منوی اصلی</div>
@@ -637,8 +645,31 @@ $user_role_fa = $role_names[$user_role] ?? 'کاربر';
                                 <?php endif; ?>
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a href="projects.php" class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'projects.php' ? 'active' : ''; ?>">
+                                <i class="fas fa-tasks"></i>
+                                <span>پروژه ها</span>
+                                <?php
+                                $pending = $pdo->query("SELECT COUNT(*) FROM tasks WHERE status = 'pending'")->fetchColumn();
+                                if ($pending > 0):
+                                ?>
+                                <span class="nav-badge"><?php echo $pending; ?></span>
+                                <?php endif; ?>
+                            </a>
+                        </li>
                     </ul>
                 </div>
+<div class="nav-section">
+    <div class="nav-section-title">هوش مصنوعی</div>
+    <ul style="padding: 0; margin: 0;">
+        <li class="nav-item">
+            <a href="rayzen.php" class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'rayzen.php' ? 'active' : ''; ?>">
+                <i class="fas fa-brain"></i>
+                <span>رایزن</span>
+            </a>
+        </li>
+    </ul>
+</div>
 
                 <div class="nav-section">
                     <div class="nav-section-title">مدیریت</div>
@@ -687,7 +718,6 @@ $user_role_fa = $role_names[$user_role] ?? 'کاربر';
                 <?php endif; ?>
             </nav>
 
-            <!-- Sidebar Footer -->
             <div class="sidebar-footer">
                 <a href="https://readystudio.ir/" target="_blank" class="sidebar-footer-brand">
                     <i class="fas fa-code"></i>
@@ -696,15 +726,13 @@ $user_role_fa = $role_names[$user_role] ?? 'کاربر';
             </div>
         </aside>
 
-        <!-- Main Content -->
         <main class="main-content">
-            <!-- Top Header -->
             <header class="top-header">
                 <div class="header-left">
                     <button class="mobile-menu-toggle" onclick="toggleSidebar()">
                         <i class="fas fa-bars"></i>
                     </button>
-                    
+
                     <div class="page-title-wrapper">
                         <h2><?php echo $page_title ?? 'داشبورد'; ?></h2>
                         <?php if (isset($breadcrumb) && !empty($breadcrumb)): ?>
@@ -725,7 +753,6 @@ $user_role_fa = $role_names[$user_role] ?? 'کاربر';
                 </div>
 
                 <div class="header-right">
-                    <!-- User Dropdown -->
                     <div class="user-dropdown">
                         <div class="user-trigger">
                             <div class="user-avatar">
@@ -737,7 +764,7 @@ $user_role_fa = $role_names[$user_role] ?? 'کاربر';
                             </div>
                             <i class="fas fa-chevron-down" style="color: var(--gray-500); font-size: 0.75rem;"></i>
                         </div>
-                        
+
                         <div class="dropdown-menu">
                             <a href="profile.php" class="dropdown-item">
                                 <i class="fas fa-user"></i>
@@ -757,15 +784,13 @@ $user_role_fa = $role_names[$user_role] ?? 'کاربر';
                 </div>
             </header>
 
-            <!-- Content Wrapper -->
             <div class="content-wrapper">
                 <?php
-                // نمایش پیام‌ها
                 if (isset($_SESSION['message'])):
                     $message = $_SESSION['message'];
                     $message_type = $_SESSION['message_type'] ?? 'info';
                     unset($_SESSION['message'], $_SESSION['message_type']);
-                    
+
                     $alert_class = [
                         'success' => 'alert-success',
                         'error' => 'alert-danger',
@@ -778,3 +803,25 @@ $user_role_fa = $role_names[$user_role] ?? 'کاربر';
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
                 <?php endif; ?>
+
+<script>
+function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    sidebar.classList.toggle('show');
+    overlay.classList.toggle('show');
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const navLinks = document.querySelectorAll('.nav-link');
+    navLinks.forEach(link => {
+        link.addEventListener('click', function() {
+            if (window.innerWidth <= 992) {
+                setTimeout(() => {
+                    toggleSidebar();
+                }, 200);
+            }
+        });
+    });
+});
+</script>

@@ -51,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $csrf_token = $_POST['csrf_token'] ?? '';
 
     if (verifyCSRFToken($csrf_token)) {
-        
+
         // 1. Add Milestone
         if ($action === 'add_milestone') {
             $title = sanitizeInput($_POST['title']);
@@ -65,11 +65,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($action === 'add_member') {
             $user_id = (int)$_POST['user_id'];
             $role = sanitizeInput($_POST['role']);
-            
+
             // Check if exists
             $exists = $pdo->prepare("SELECT id FROM project_members WHERE project_id = ? AND user_id = ?");
             $exists->execute([$project_id, $user_id]);
-            
+
             if (!$exists->fetch()) {
                 $pdo->prepare("INSERT INTO project_members (project_id, user_id, role) VALUES (?, ?, ?)")
                     ->execute([$project_id, $user_id, $role]);
@@ -87,7 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ->execute([$project_id, $_SESSION['user_id'], $body]);
             }
         }
-        
+
         // 4. Update Status (Quick Action)
         if ($action === 'update_status') {
             $status = $_POST['status'];
@@ -105,9 +105,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // 1. Main Project Info
 $stmt = $pdo->prepare("
-    SELECT p.*, 
+    SELECT p.*,
            CONCAT(m.first_name, ' ', m.last_name) as manager_name, m.avatar as manager_avatar,
-           c.name as customer_name
+           c.company_name as customer_name
     FROM projects p
     LEFT JOIN users m ON p.manager_id = m.id
     LEFT JOIN customers c ON p.customer_id = c.id
@@ -123,7 +123,7 @@ if (!$project) {
 
 // 2. Stats & Tasks
 $task_stats = $pdo->prepare("
-    SELECT 
+    SELECT
         COUNT(*) as total,
         SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
         SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
@@ -136,7 +136,7 @@ $completion_rate = $t_stats['total'] > 0 ? round(($t_stats['completed'] / $t_sta
 
 // 3. Members
 $members = $pdo->prepare("
-    SELECT pm.*, CONCAT(u.first_name, ' ', u.last_name) as name, u.avatar 
+    SELECT pm.*, CONCAT(u.first_name, ' ', u.last_name) as name, u.avatar
     FROM project_members pm
     JOIN users u ON pm.user_id = u.id
     WHERE pm.project_id = ?
@@ -151,8 +151,8 @@ $roadmap = $milestones->fetchAll();
 
 // 5. Recent Tasks
 $tasks_query = $pdo->prepare("
-    SELECT t.*, CONCAT(u.first_name, ' ', u.last_name) as assignee 
-    FROM tasks t LEFT JOIN users u ON t.assigned_to = u.id 
+    SELECT t.*, CONCAT(u.first_name, ' ', u.last_name) as assignee
+    FROM tasks t LEFT JOIN users u ON t.assigned_to = u.id
     WHERE t.project_id = ? ORDER BY t.created_at DESC LIMIT 10
 ");
 $tasks_query->execute([$project_id]);
@@ -160,17 +160,20 @@ $recent_tasks = $tasks_query->fetchAll();
 
 // 6. Comments
 $comments_query = $pdo->prepare("
-    SELECT c.*, CONCAT(u.first_name, ' ', u.last_name) as user_name 
-    FROM comments c JOIN users u ON c.user_id = u.id 
-    WHERE c.related_type = 'project' AND c.related_id = ? 
+    SELECT c.*, CONCAT(u.first_name, ' ', u.last_name) as user_name
+    FROM comments c JOIN users u ON c.user_id = u.id
+    WHERE c.related_type = 'project' AND c.related_id = ?
     ORDER BY c.created_at DESC
 ");
 $comments_query->execute([$project_id]);
 $comments = $comments_query->fetchAll();
 
-// Calculate Days
-$days_total = (strtotime($project['deadline']) - strtotime($project['start_date'])) / 86400;
-$days_passed = (time() - strtotime($project['start_date'])) / 86400;
+// Calculate Days - FIXED: null check for deadline & start_date
+$deadline_ts   = !empty($project['deadline'])   ? strtotime($project['deadline'])   : null;
+$start_date_ts = !empty($project['start_date']) ? strtotime($project['start_date']) : null;
+
+$days_total    = ($deadline_ts && $start_date_ts) ? ($deadline_ts - $start_date_ts) / 86400 : 0;
+$days_passed   = $start_date_ts ? (time() - $start_date_ts) / 86400 : 0;
 $time_progress = $days_total > 0 ? min(100, max(0, round(($days_passed / $days_total) * 100))) : 0;
 
 // All Users (for modal)
@@ -218,7 +221,7 @@ include __DIR__ . '/../private/header.php';
         border-radius: 16px; display: flex; align-items: center; justify-content: center;
         font-size: 2rem; font-weight: 800; box-shadow: 0 10px 20px rgba(0, 176, 164, 0.2);
     }
-    
+
     /* Tabs */
     .nav-pills-custom {
         display: flex; gap: 8px; margin-bottom: 24px; border-bottom: 1px solid var(--gray-border); padding-bottom: 16px;
@@ -254,7 +257,7 @@ include __DIR__ . '/../private/header.php';
         position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
         text-align: center;
     }
-    
+
     /* Mini Task List */
     .task-row {
         display: flex; align-items: center; justify-content: space-between;
@@ -309,7 +312,7 @@ include __DIR__ . '/../private/header.php';
             </div>
         </div>
     </div>
-    
+
     <div class="d-flex gap-2">
         <form method="POST" class="d-inline">
             <input type="hidden" name="action" value="update_status">
@@ -320,7 +323,7 @@ include __DIR__ . '/../private/header.php';
                 <option value="on_hold" <?php echo $project['status'] == 'on_hold' ? 'selected' : ''; ?>>متوقف</option>
             </select>
         </form>
-        
+
         <?php if (hasPermission('edit_project')): ?>
             <a href="project_form.php?id=<?php echo $project_id; ?>" class="btn btn-light border fw-bold">
                 <?php echo $icons['edit']; ?> <span class="d-none d-md-inline ms-1">ویرایش</span>
@@ -333,7 +336,7 @@ include __DIR__ . '/../private/header.php';
 
     <!-- ─── LEFT COLUMN: MAIN CONTENT ────────────────────────────────────── -->
     <div class="left-col">
-        
+
         <!-- Header Card -->
         <div class="app-card project-header-card">
             <div class="d-flex gap-3">
@@ -346,15 +349,22 @@ include __DIR__ . '/../private/header.php';
                         <?php echo $project['description'] ? nl2br(htmlspecialchars($project['description'])) : 'توضیحاتی ثبت نشده است.'; ?>
                     </p>
                     <div class="mt-3">
-                        <?php 
-                        $tags = explode(',', $project['tags']);
-                        foreach($tags as $tag): if(trim($tag)): ?>
-                            <span class="badge bg-white text-dark border me-1">#<?php echo trim($tag); ?></span>
-                        <?php endif; endforeach; ?>
+<?php
+// FIXED: explode null protection
+$tags = !empty($project['tags']) ? explode(',', $project['tags']) : [];
+foreach($tags as $tag):
+    $tag = trim($tag);
+    if($tag):
+?>
+    <span class="badge bg-white text-dark border me-1">#<?php echo htmlspecialchars($tag); ?></span>
+<?php
+    endif;
+endforeach;
+?>
                     </div>
                 </div>
             </div>
-            
+
             <!-- Dynamic Health/Progress Circle -->
             <div class="d-flex flex-column align-items-center">
                 <div class="donut-chart">
@@ -393,7 +403,7 @@ include __DIR__ . '/../private/header.php';
                             </div>
                         </div>
                         <div class="mt-3 small">
-                            <span class="text-success fw-bold"><?php echo $t_stats['completed']; ?></span> تکمیل شده • 
+                            <span class="text-success fw-bold"><?php echo $t_stats['completed']; ?></span> تکمیل شده •
                             <span class="text-danger fw-bold"><?php echo $t_stats['overdue']; ?></span> تاخیر
                         </div>
                     </div>
@@ -473,7 +483,7 @@ include __DIR__ . '/../private/header.php';
                     <div class="text-center text-muted py-4">هنوز وظیفه‌ای تعریف نشده است.</div>
                 <?php else: ?>
                     <div class="task-list">
-                        <?php foreach($recent_tasks as $task): 
+                        <?php foreach($recent_tasks as $task):
                              $is_done = $task['status'] == 'completed';
                         ?>
                             <div class="task-row">
@@ -509,12 +519,12 @@ include __DIR__ . '/../private/header.php';
                     <h5 class="fw-bold mb-0">نقشه راه پروژه</h5>
                     <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#addMilestoneModal"><?php echo $icons['plus']; ?> افزودن فاز</button>
                 </div>
-                
+
                 <div class="timeline">
                     <?php if(empty($roadmap)): ?>
                         <p class="text-muted">هیچ مایل‌استونی تعریف نشده است.</p>
                     <?php else: ?>
-                        <?php foreach($roadmap as $ms): 
+                        <?php foreach($roadmap as $ms):
                              $ms_passed = strtotime($ms['due_date']) < time();
                         ?>
                             <div class="timeline-item">
@@ -538,7 +548,7 @@ include __DIR__ . '/../private/header.php';
                     <h5 class="fw-bold mb-0">اعضای تیم</h5>
                     <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addMemberModal"><?php echo $icons['plus']; ?> افزودن عضو</button>
                 </div>
-                
+
                 <div class="team-grid">
                     <!-- Manager -->
                     <div class="member-card border-primary bg-primary-subtle">
@@ -562,7 +572,7 @@ include __DIR__ . '/../private/header.php';
                 </div>
             </div>
         </div>
-        
+
         <!-- ─── TAB 5: FILES ─────────────────────────────────────────────── -->
         <div id="tab-files" class="tab-content" style="display: none;">
             <div class="app-card text-center py-5">
@@ -581,7 +591,7 @@ include __DIR__ . '/../private/header.php';
     <div class="right-col">
         <div class="app-card">
             <h6 class="fw-bold border-bottom pb-2 mb-3">اطلاعات کلیدی</h6>
-            
+
             <div class="mb-3">
                 <label class="small text-muted d-block">مدیر پروژه</label>
                 <div class="d-flex align-items-center gap-2 mt-1">
@@ -690,7 +700,7 @@ include __DIR__ . '/../private/header.php';
         document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
         // Show selected
         document.getElementById('tab-' + tabName).style.display = 'block';
-        
+
         // Update Nav State
         document.querySelectorAll('.nav-link-custom').forEach(el => el.classList.remove('active'));
         event.currentTarget.classList.add('active');

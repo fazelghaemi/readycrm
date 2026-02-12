@@ -23,10 +23,9 @@ require_once __DIR__ . '/../private/auth.php';
 require_once __DIR__ . '/../private/functions.php';
 
 // ─── AUTH CHECK ─────────────────────────────────────────────────────────────
-if (!hasPermission('view_projects')) {
-    // اگر در سیستم پرمیشن جدا ندارید، از view_dashboard یا similar استفاده کنید
-    // فرض بر این است که جدول پرمیشن‌ها آپدیت شده است
-}
+requireLogin();
+// اگر سیستم پرمیشن view_projects ندارد، می‌توانید این خط را کامنت کنید
+// checkPermission('view_projects');
 
 // ─── SVG ICONS REPOSITORY ───────────────────────────────────────────────────
 $icons = [
@@ -53,35 +52,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $csrf_token = $_POST['csrf_token'] ?? '';
 
     if (verifyCSRFToken($csrf_token)) {
-        
+
         // Delete Project
         if ($action === 'delete') {
             $project_id = (int)$_POST['project_id'];
-            // FK constraints will handle children or use separate queries if needed
-            $stmt = $pdo->prepare("DELETE FROM projects WHERE id = ?");
-            $stmt->execute([$project_id]);
-            logActivity($_SESSION['user_id'], 'delete_project', 'projects', $project_id);
-            setMessage('پروژه با موفقیت حذف شد', 'success');
+            try {
+                // حذف وابستگی‌ها
+                $pdo->prepare("DELETE FROM project_members WHERE project_id = ?")->execute([$project_id]);
+                $pdo->prepare("DELETE FROM project_milestones WHERE project_id = ?")->execute([$project_id]);
+                $pdo->prepare("DELETE FROM tasks WHERE project_id = ?")->execute([$project_id]);
+                // حذف کامنت‌های مرتبط
+                $pdo->prepare("DELETE FROM comments WHERE related_type = 'project' AND related_id = ?")->execute([$project_id]);
+                
+                // حذف پروژه
+                $pdo->prepare("DELETE FROM projects WHERE id = ?")->execute([$project_id]);
+                
+                logActivity($_SESSION['user_id'], 'delete_project', 'projects', $project_id);
+                setMessage('پروژه با موفقیت حذف شد', 'success');
+            } catch (PDOException $e) {
+                setMessage('خطا در حذف پروژه: ' . $e->getMessage(), 'error');
+            }
+            header("Location: projects.php");
+            exit();
         }
 
         // Quick Add Project
         if ($action === 'quick_add') {
             $title = sanitizeInput($_POST['title']);
-            $code = 'PRJ-' . rand(1000, 9999); // Generate basic code
+            $code = 'PRJ-' . rand(1000, 9999);
             $manager_id = (int)$_POST['manager_id'];
             $start_date = $_POST['start_date'] ?: date('Y-m-d');
-            
+
             if ($title && $manager_id) {
-                $stmt = $pdo->prepare("INSERT INTO projects (project_code, title, manager_id, start_date, created_by) VALUES (?, ?, ?, ?, ?)");
-                $stmt->execute([$code, $title, $manager_id, $start_date, $_SESSION['user_id']]);
-                
-                // Add Manager as Member automatically
-                $new_id = $pdo->lastInsertId();
-                $pdo->prepare("INSERT INTO project_members (project_id, user_id, role) VALUES (?, ?, 'manager')")
-                    ->execute([$new_id, $manager_id]);
-                
-                setMessage('پروژه جدید با موفقیت ایجاد شد', 'success');
+                try {
+                    $stmt = $pdo->prepare("
+                        INSERT INTO projects (project_code, title, manager_id, start_date, created_by, status) 
+                        VALUES (?, ?, ?, ?, ?, 'not_started')
+                    ");
+                    $stmt->execute([$code, $title, $manager_id, $start_date, $_SESSION['user_id']]);
+
+                    $new_id = $pdo->lastInsertId();
+                    
+                    // اضافه کردن مدیر به اعضای پروژه
+                    $pdo->prepare("INSERT INTO project_members (project_id, user_id, role) VALUES (?, ?, 'manager')")
+                        ->execute([$new_id, $manager_id]);
+
+                    setMessage('پروژه جدید با موفقیت ایجاد شد', 'success');
+                } catch (PDOException $e) {
+                    setMessage('خطا در ایجاد پروژه: ' . $e->getMessage(), 'error');
+                }
             }
+            header("Location: projects.php");
+            exit();
         }
     }
 }
@@ -123,34 +145,50 @@ if ($sort === 'progress') $order_by = "p.progress DESC";
 if ($sort === 'budget') $order_by = "p.budget DESC";
 
 // ─── STATS ─────────────────────────────────────────────────────────────────
-$stats = [
-    'total' => $pdo->query("SELECT COUNT(*) FROM projects")->fetchColumn(),
-    'active' => $pdo->query("SELECT COUNT(*) FROM projects WHERE status = 'in_progress'")->fetchColumn(),
-    'budget' => $pdo->query("SELECT COALESCE(SUM(budget), 0) FROM projects")->fetchColumn(),
-    'delayed' => $pdo->query("SELECT COUNT(*) FROM projects WHERE deadline < CURDATE() AND status != 'completed'")->fetchColumn(),
-];
+try {
+    $stats = [
+        'total' => (int)$pdo->query("SELECT COUNT(*) FROM projects")->fetchColumn(),
+        'active' => (int)$pdo->query("SELECT COUNT(*) FROM projects WHERE status = 'in_progress'")->fetchColumn(),
+        'budget' => (float)$pdo->query("SELECT COALESCE(SUM(budget), 0) FROM projects")->fetchColumn(),
+        'delayed' => (int)$pdo->query("SELECT COUNT(*) FROM projects WHERE deadline < CURDATE() AND status NOT IN ('completed', 'cancelled')")->fetchColumn(),
+    ];
+} catch (PDOException $e) {
+    $stats = ['total' => 0, 'active' => 0, 'budget' => 0, 'delayed' => 0];
+    error_log("Stats query error: " . $e->getMessage());
+}
 
 // ─── FETCH PROJECTS ────────────────────────────────────────────────────────
-// Using subqueries for counts to keep it efficient
-$sql = "
-    SELECT p.*,
-           CONCAT(m.first_name, ' ', m.last_name) as manager_name, m.avatar as manager_avatar,
-           c.name as customer_name,
-           (SELECT COUNT(*) FROM project_members WHERE project_id = p.id) as member_count,
-           (SELECT COUNT(*) FROM tasks WHERE project_id = p.id AND status != 'completed') as open_tasks
-    FROM projects p
-    LEFT JOIN users m ON p.manager_id = m.id
-    LEFT JOIN customers c ON p.customer_id = c.id
-    WHERE $where_sql
-    ORDER BY $order_by
-";
+// تصحیح: استفاده از company_name به جای c.name
+try {
+    $sql = "
+        SELECT p.*,
+               CONCAT(m.first_name, ' ', m.last_name) as manager_name, 
+               m.avatar as manager_avatar,
+               c.company_name as customer_name,
+               (SELECT COUNT(*) FROM project_members WHERE project_id = p.id) as member_count,
+               (SELECT COUNT(*) FROM tasks WHERE project_id = p.id AND status != 'completed') as open_tasks
+        FROM projects p
+        LEFT JOIN users m ON p.manager_id = m.id
+        LEFT JOIN customers c ON p.customer_id = c.id
+        WHERE $where_sql
+        ORDER BY $order_by
+    ";
 
-$stmt = $pdo->prepare($sql);
-$stmt->execute($params);
-$projects = $stmt->fetchAll();
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $projects = $stmt->fetchAll();
+} catch (PDOException $e) {
+    $projects = [];
+    setMessage('خطا در بارگذاری پروژه‌ها: ' . $e->getMessage(), 'error');
+    error_log("Projects query error: " . $e->getMessage());
+}
 
 // Fetch Users for dropdowns
-$users = $pdo->query("SELECT id, first_name, last_name FROM users WHERE status = 'active'")->fetchAll();
+try {
+    $users = $pdo->query("SELECT id, first_name, last_name FROM users WHERE status = 'active' ORDER BY first_name")->fetchAll();
+} catch (PDOException $e) {
+    $users = [];
+}
 
 $csrf_token = generateCSRFToken();
 include __DIR__ . '/../private/header.php';
@@ -178,7 +216,7 @@ include __DIR__ . '/../private/header.php';
         gap: 24px;
         margin-bottom: 32px;
     }
-    
+
     .stat-card {
         background: white;
         border-radius: var(--card-radius);
@@ -191,16 +229,16 @@ include __DIR__ . '/../private/header.php';
         align-items: center;
         justify-content: space-between;
     }
-    
+
     .stat-card:hover {
         transform: translateY(-4px);
         box-shadow: 0 10px 30px rgba(0,0,0,0.05);
         border-color: var(--brand);
     }
-    
+
     .stat-content h3 { font-size: 1.8rem; font-weight: 800; margin: 0; color: var(--dark); }
     .stat-content p { margin: 5px 0 0; color: var(--text-gray); font-size: 0.9rem; }
-    
+
     .stat-icon-wrapper {
         width: 60px; height: 60px;
         border-radius: 16px;
@@ -253,8 +291,10 @@ include __DIR__ . '/../private/header.php';
         background: white;
         cursor: pointer;
         outline: none;
+        transition: var(--transition);
     }
-    
+    .custom-select:focus { border-color: var(--brand); }
+
     .view-switcher {
         display: flex;
         background: #f1f5f9;
@@ -270,7 +310,7 @@ include __DIR__ . '/../private/header.php';
         cursor: pointer;
         transition: var(--transition);
     }
-    .view-btn.active { background: white; color: var(--brand); shadow: 0 2px 5px rgba(0,0,0,0.05); }
+    .view-btn.active { background: white; color: var(--brand); box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
 
     /* ─── Project Grid Cards ─── */
     .projects-grid {
@@ -290,7 +330,7 @@ include __DIR__ . '/../private/header.php';
         flex-direction: column;
         height: 100%;
     }
-    
+
     .project-card:hover {
         border-color: var(--brand);
         transform: translateY(-5px);
@@ -329,7 +369,7 @@ include __DIR__ . '/../private/header.php';
 
     .project-meta {
         font-size: 0.85rem; color: var(--text-gray);
-        margin-bottom: 20px; display: flex; gap: 15px;
+        margin-bottom: 20px; display: flex; gap: 15px; flex-wrap: wrap;
     }
 
     .progress-wrapper { margin-bottom: 20px; }
@@ -358,12 +398,15 @@ include __DIR__ . '/../private/header.php';
     }
     .team-member:first-child { margin-right: 0; }
 
-    /* ─── List View Overrides ─── */
-    .projects-list { display: none; } /* Hidden by default */
+    /* ─── List View ─── */
+    .projects-list { display: none; }
     .custom-table { width: 100%; border-collapse: separate; border-spacing: 0; }
-    .custom-table th { text-align: right; padding: 16px; border-bottom: 2px solid #e2e8f0; color: var(--text-gray); font-weight: 600; }
-    .custom-table td { padding: 16px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; background: white; }
-    .custom-table tr:hover td { background: #f8fafc; }
+    .custom-table th { 
+        text-align: right; padding: 16px; border-bottom: 2px solid #e2e8f0; 
+        color: var(--text-gray); font-weight: 600; background: #f8fafc;
+    }
+    .custom-table td { padding: 16px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; background: white; }
+    .custom-table tbody tr:hover td { background: #f8fafc; }
 
     /* ─── Utility ─── */
     .btn-brand {
@@ -371,22 +414,31 @@ include __DIR__ . '/../private/header.php';
         border: none; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;
         transition: var(--transition); text-decoration: none;
     }
-    .btn-brand:hover { background: var(--brand-hover); }
-    
+    .btn-brand:hover { background: var(--brand-hover); color: white; }
+
     .status-badge {
         padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;
     }
-    .status-in_progress { background: #e0f2fe; color: #0284c7; }
-    .status-completed { background: #dcfce7; color: #16a34a; }
+    .status-in_progress { background: #e0f2fe; color: #0369a1; }
+    .status-completed { background: #dcfce7; color: #15803d; }
     .status-on_hold { background: #fef9c3; color: #854d0e; }
     .status-cancelled { background: #fee2e2; color: #991b1b; }
     .status-not_started { background: #f1f5f9; color: #475569; }
 
+    .empty-state {
+        text-align: center; padding: 60px 20px; color: var(--text-gray);
+    }
+    .empty-state svg { width: 120px; height: 120px; opacity: 0.3; margin-bottom: 20px; }
+
     @media (max-width: 768px) {
         .toolbar-card { flex-direction: column; align-items: stretch; }
         .search-box { max-width: 100%; }
+        .projects-grid { grid-template-columns: 1fr; }
     }
 </style>
+
+<!-- ─── FLASH MESSAGES ────────────────────────────────────────────────────── -->
+<?php echo displayMessage(); ?>
 
 <!-- ─── STATS SECTION ─────────────────────────────────────────────────────── -->
 <div class="stats-container">
@@ -444,19 +496,22 @@ include __DIR__ . '/../private/header.php';
                 <option value="in_progress" <?php echo $status == 'in_progress' ? 'selected' : ''; ?>>در حال انجام</option>
                 <option value="completed" <?php echo $status == 'completed' ? 'selected' : ''; ?>>تکمیل شده</option>
                 <option value="not_started" <?php echo $status == 'not_started' ? 'selected' : ''; ?>>شروع نشده</option>
+                <option value="on_hold" <?php echo $status == 'on_hold' ? 'selected' : ''; ?>>متوقف شده</option>
             </select>
-            
+
             <select name="priority" class="custom-select" onchange="this.form.submit()">
                 <option value="">همه اولویت‌ها</option>
                 <option value="urgent" <?php echo $priority == 'urgent' ? 'selected' : ''; ?>>فوری</option>
                 <option value="high" <?php echo $priority == 'high' ? 'selected' : ''; ?>>بالا</option>
                 <option value="medium" <?php echo $priority == 'medium' ? 'selected' : ''; ?>>متوسط</option>
+                <option value="low" <?php echo $priority == 'low' ? 'selected' : ''; ?>>کم</option>
             </select>
 
             <select name="sort" class="custom-select" onchange="this.form.submit()">
                 <option value="newest" <?php echo $sort == 'newest' ? 'selected' : ''; ?>>جدیدترین</option>
                 <option value="deadline" <?php echo $sort == 'deadline' ? 'selected' : ''; ?>>نزدیکترین ددلاین</option>
                 <option value="progress" <?php echo $sort == 'progress' ? 'selected' : ''; ?>>بیشترین پیشرفت</option>
+                <option value="budget" <?php echo $sort == 'budget' ? 'selected' : ''; ?>>بیشترین بودجه</option>
             </select>
         </div>
 
@@ -466,12 +521,10 @@ include __DIR__ . '/../private/header.php';
                 <button type="button" class="view-btn active" id="btnGrid" onclick="setView('grid')"><?php echo $icons['grid']; ?></button>
                 <button type="button" class="view-btn" id="btnList" onclick="setView('list')"><?php echo $icons['list']; ?></button>
             </div>
-            
-            <?php if (hasPermission('add_project')): ?>
-                <a href="project_form.php" class="btn-brand">
-                    <?php echo $icons['plus']; ?> پروژه جدید
-                </a>
-            <?php endif; ?>
+
+            <a href="project_form.php" class="btn-brand">
+                <?php echo $icons['plus']; ?> پروژه جدید
+            </a>
         </div>
     </form>
 </div>
@@ -479,12 +532,18 @@ include __DIR__ . '/../private/header.php';
 <!-- ─── PROJECTS DISPLAY (GRID VIEW) ──────────────────────────────────────── -->
 <div id="projectsGrid" class="projects-grid">
     <?php if (empty($projects)): ?>
-        <div class="col-12 text-center py-5">
-            <img src="<?php echo ASSETS_URL; ?>/img/empty-state.svg" alt="No Projects" style="width: 200px; opacity: 0.5;">
-            <p class="text-muted mt-3">هیچ پروژه‌ای یافت نشد.</p>
+        <div class="col-12">
+            <div class="empty-state">
+                <?php echo $icons['briefcase']; ?>
+                <h5>هیچ پروژه‌ای یافت نشد</h5>
+                <p class="text-muted">برای شروع، یک پروژه جدید ایجاد کنید.</p>
+                <a href="project_form.php" class="btn-brand mt-3">
+                    <?php echo $icons['plus']; ?> ایجاد اولین پروژه
+                </a>
+            </div>
         </div>
     <?php else: ?>
-        <?php foreach ($projects as $prj): 
+        <?php foreach ($projects as $prj):
             $days_left = $prj['deadline'] ? ceil((strtotime($prj['deadline']) - time()) / 86400) : null;
             $deadline_color = ($days_left !== null && $days_left < 3 && $days_left >= 0) ? 'text-danger' : 'text-muted';
         ?>
@@ -492,69 +551,78 @@ include __DIR__ . '/../private/header.php';
             <div class="card-header-custom">
                 <div class="d-flex gap-3 align-items-center">
                     <div class="project-icon">
-                        <?php echo mb_substr($prj['title'], 0, 1); ?>
+                        <?php echo mb_substr($prj['title'], 0, 1, 'UTF-8'); ?>
                     </div>
                     <div>
                         <span class="status-badge status-<?php echo $prj['status']; ?> mb-1 d-inline-block">
-                            <?php echo getStatusTitle($prj['status']); ?>
+                            <?php echo getStatusTitle($prj['status'], 'project'); ?>
                         </span>
-                        <div class="text-muted small" style="font-size: 0.75rem;"><?php echo $prj['project_code']; ?></div>
+                        <div class="text-muted small" style="font-size: 0.75rem;"><?php echo htmlspecialchars($prj['project_code']); ?></div>
                     </div>
                 </div>
                 <div class="dropdown">
-                    <button class="btn btn-link text-muted p-0" data-bs-toggle="dropdown">
+                    <button class="btn btn-link text-muted p-0" data-bs-toggle="dropdown" aria-expanded="false">
                         <?php echo $icons['more']; ?>
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end border-0 shadow-lg rounded-3">
                         <li><a class="dropdown-item" href="project_view.php?id=<?php echo $prj['id']; ?>"><?php echo $icons['eye']; ?> مشاهده</a></li>
                         <li><a class="dropdown-item" href="project_form.php?id=<?php echo $prj['id']; ?>"><?php echo $icons['edit']; ?> ویرایش</a></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item text-danger" href="#" onclick="confirmDelete(<?php echo $prj['id']; ?>)"><?php echo $icons['trash']; ?> حذف</a></li>
+                        <li><a class="dropdown-item text-danger" href="#" onclick="confirmDelete(<?php echo $prj['id']; ?>); return false;"><?php echo $icons['trash']; ?> حذف</a></li>
                     </ul>
                 </div>
             </div>
 
             <a href="project_view.php?id=<?php echo $prj['id']; ?>" class="project-title"><?php echo htmlspecialchars($prj['title']); ?></a>
-            
+
             <div class="project-meta">
                 <?php if($prj['customer_name']): ?>
                     <span><i class="fas fa-building ms-1"></i> <?php echo htmlspecialchars($prj['customer_name']); ?></span>
                 <?php endif; ?>
-                <span><i class="fas fa-tasks ms-1"></i> <?php echo $prj['open_tasks']; ?> وظیفه باز</span>
+                <span><i class="fas fa-tasks ms-1"></i> <?php echo (int)$prj['open_tasks']; ?> وظیفه باز</span>
             </div>
 
             <div class="progress-wrapper">
                 <div class="progress-info">
                     <span class="text-muted">پیشرفت</span>
-                    <span class="fw-bold text-dark"><?php echo $prj['progress']; ?>%</span>
+                    <span class="fw-bold text-dark"><?php echo (int)$prj['progress']; ?>%</span>
                 </div>
                 <div class="progress-bar-bg">
-                    <div class="progress-fill" style="width: <?php echo $prj['progress']; ?>%"></div>
+                    <div class="progress-fill" style="width: <?php echo (int)$prj['progress']; ?>%"></div>
                 </div>
             </div>
 
             <div class="card-footer-custom">
                 <div class="team-stack">
                     <?php if($prj['manager_name']): ?>
-                        <div class="team-member" title="مدیر: <?php echo $prj['manager_name']; ?>" style="border-color: var(--brand); color: var(--brand);">
-                             <?php echo mb_substr($prj['manager_name'], 0, 1); ?>
+                        <div class="team-member" title="مدیر: <?php echo htmlspecialchars($prj['manager_name']); ?>" style="border-color: var(--brand); color: var(--brand);">
+                             <?php echo mb_substr($prj['manager_name'], 0, 1, 'UTF-8'); ?>
                         </div>
                     <?php endif; ?>
-                    
-                    <?php for($i=0; $i < min(3, $prj['member_count']); $i++): ?>
+
+                    <?php 
+                    $member_count = (int)$prj['member_count'];
+                    for($i=0; $i < min(3, $member_count); $i++): 
+                    ?>
                         <div class="team-member">M</div>
                     <?php endfor; ?>
-                    
-                    <?php if($prj['member_count'] > 3): ?>
-                        <div class="team-member" style="background: white; border-color: #cbd5e1;">+<?php echo $prj['member_count'] - 3; ?></div>
+
+                    <?php if($member_count > 3): ?>
+                        <div class="team-member" style="background: white; border-color: #cbd5e1;">+<?php echo $member_count - 3; ?></div>
                     <?php endif; ?>
                 </div>
 
                 <div class="d-flex align-items-center gap-2 <?php echo $deadline_color; ?>" style="font-size: 0.85rem;">
                     <?php echo $icons['calendar']; ?>
-                    <?php 
+                    <?php
                         if ($days_left !== null) {
-                            echo $days_left < 0 ? abs($days_left) . ' روز تاخیر' : $days_left . ' روز مانده';
+                            if ($days_left < 0) {
+                                echo abs($days_left) . ' روز تاخیر';
+                            } elseif ($days_left == 0) {
+                                echo 'امروز';
+                            } else {
+                                echo $days_left . ' روز مانده';
+                            }
                         } else {
                             echo 'بدون ددلاین';
                         }
@@ -571,7 +639,7 @@ include __DIR__ . '/../private/header.php';
     <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
         <div class="table-responsive">
             <table class="custom-table">
-                <thead class="bg-light">
+                <thead>
                     <tr>
                         <th>کد پروژه</th>
                         <th>نام پروژه</th>
@@ -584,52 +652,64 @@ include __DIR__ . '/../private/header.php';
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($projects as $prj): ?>
-                    <tr>
-                        <td class="text-muted fw-bold"><?php echo $prj['project_code']; ?></td>
-                        <td>
-                            <a href="project_view.php?id=<?php echo $prj['id']; ?>" class="text-dark fw-bold text-decoration-none">
-                                <?php echo htmlspecialchars($prj['title']); ?>
-                            </a>
-                            <?php if($prj['priority'] == 'urgent'): ?>
-                                <span class="badge bg-danger rounded-pill me-2" style="font-size:0.6rem;">فوری</span>
-                            <?php endif; ?>
-                        </td>
-                        <td>
-                            <div class="d-flex align-items-center gap-2">
-                                <div class="team-member" style="width:28px;height:28px;font-size:0.7rem;margin:0;">
-                                    <?php echo mb_substr($prj['manager_name'] ?? '?', 0, 1); ?>
+                    <?php if (empty($projects)): ?>
+                        <tr>
+                            <td colspan="8" class="text-center py-5 text-muted">
+                                هیچ پروژه‌ای یافت نشد
+                            </td>
+                        </tr>
+                    <?php else: ?>
+                        <?php foreach ($projects as $prj): ?>
+                        <tr>
+                            <td class="text-muted fw-bold"><?php echo htmlspecialchars($prj['project_code']); ?></td>
+                            <td>
+                                <a href="project_view.php?id=<?php echo $prj['id']; ?>" class="text-dark fw-bold text-decoration-none">
+                                    <?php echo htmlspecialchars($prj['title']); ?>
+                                </a>
+                                <?php if($prj['priority'] == 'urgent'): ?>
+                                    <span class="badge bg-danger rounded-pill ms-2" style="font-size:0.6rem;">فوری</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="team-member" style="width:28px;height:28px;font-size:0.7rem;margin:0;">
+                                        <?php echo mb_substr($prj['manager_name'] ?? '?', 0, 1, 'UTF-8'); ?>
+                                    </div>
+                                    <span class="small"><?php echo htmlspecialchars($prj['manager_name'] ?? 'نامشخص'); ?></span>
                                 </div>
-                                <span class="small"><?php echo $prj['manager_name']; ?></span>
-                            </div>
-                        </td>
-                        <td>
-                            <span class="status-badge status-<?php echo $prj['status']; ?>">
-                                <?php echo getStatusTitle($prj['status']); ?>
-                            </span>
-                        </td>
-                        <td style="width: 150px;">
-                            <div class="d-flex align-items-center gap-2">
-                                <div class="progress flex-grow-1" style="height: 6px;">
-                                    <div class="progress-bar bg-info" style="width: <?php echo $prj['progress']; ?>%"></div>
+                            </td>
+                            <td>
+                                <span class="status-badge status-<?php echo $prj['status']; ?>">
+                                    <?php echo getStatusTitle($prj['status'], 'project'); ?>
+                                </span>
+                            </td>
+                            <td style="width: 150px;">
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="progress flex-grow-1" style="height: 6px;">
+                                        <div class="progress-bar bg-info" style="width: <?php echo (int)$prj['progress']; ?>%"></div>
+                                    </div>
+                                    <span class="small text-muted"><?php echo (int)$prj['progress']; ?>%</span>
                                 </div>
-                                <span class="small text-muted"><?php echo $prj['progress']; ?>%</span>
-                            </div>
-                        </td>
-                        <td class="small text-muted">
-                            <?php echo $prj['deadline'] ? formatPersianDate($prj['deadline']) : '-'; ?>
-                        </td>
-                        <td class="small fw-bold text-dark">
-                            <?php echo formatMoney($prj['budget']); ?>
-                        </td>
-                        <td>
-                            <div class="d-flex gap-2">
-                                <a href="project_form.php?id=<?php echo $prj['id']; ?>" class="btn btn-sm btn-light text-primary"><?php echo $icons['edit']; ?></a>
-                                <button onclick="confirmDelete(<?php echo $prj['id']; ?>)" class="btn btn-sm btn-light text-danger"><?php echo $icons['trash']; ?></button>
-                            </div>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
+                            </td>
+                            <td class="small text-muted">
+                                <?php echo $prj['deadline'] ? formatPersianDate($prj['deadline']) : '-'; ?>
+                            </td>
+                            <td class="small fw-bold text-dark">
+                                <?php echo formatMoney($prj['budget'] ?? 0); ?>
+                            </td>
+                            <td>
+                                <div class="d-flex gap-2">
+                                    <a href="project_form.php?id=<?php echo $prj['id']; ?>" class="btn btn-sm btn-light text-primary" title="ویرایش">
+                                        <?php echo $icons['edit']; ?>
+                                    </a>
+                                    <button onclick="confirmDelete(<?php echo $prj['id']; ?>)" class="btn btn-sm btn-light text-danger" title="حذف">
+                                        <?php echo $icons['trash']; ?>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
                 </tbody>
             </table>
         </div>
@@ -675,15 +755,16 @@ include __DIR__ . '/../private/header.php';
             showCancelButton: true,
             confirmButtonColor: '#ef4444',
             confirmButtonText: 'بله، حذف کن',
-            cancelButtonText: 'لغو'
+            cancelButtonText: 'لغو',
+            cancelButtonColor: '#64748b'
         }).then((result) => {
             if (result.isConfirmed) {
                 const form = document.createElement('form');
                 form.method = 'POST';
                 form.innerHTML = `
-                    <input type=\"hidden\" name=\"action\" value=\"delete\">
-                    <input type=\"hidden\" name=\"project_id\" value=\"${id}\">
-                    <input type=\"hidden\" name=\"csrf_token\" value=\"<?php echo $csrf_token; ?>\">
+                    <input type="hidden" name="action" value="delete">
+                    <input type="hidden" name="project_id" value="${id}">
+                    <input type="hidden" name="csrf_token" value="<?php echo $csrf_token; ?>">
                 `;
                 document.body.appendChild(form);
                 form.submit();
