@@ -1,0 +1,15 @@
+# Deny all access to database directory
+Require all denied
+
+# Additional security measures
+<FilesMatch ".*">
+    Require all denied
+</FilesMatch>
+
+# Disable directory browsing
+Options -Indexes
+
+# Block all file types
+<FilesMatch "\.*">
+    Require all denied
+</FilesMatch>

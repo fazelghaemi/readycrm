@@ -11,9 +11,6 @@
 *.tmp
 
 # Directories
-/private/
-/database/
-/uploads/
 /backups/
 /config/
 /includes/
