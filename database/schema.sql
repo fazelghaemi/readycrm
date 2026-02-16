@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: localhost:3306
--- Generation Time: Feb 14, 2026 at 12:33 PM
+-- Generation Time: Feb 16, 2026 at 02:46 PM
 -- Server version: 10.6.25-MariaDB-log
 -- PHP Version: 8.4.16
 
@@ -25,6 +25,83 @@ DELIMITER $$
 --
 -- Procedures
 --
+CREATE DEFINER=`readycr`@`localhost` PROCEDURE `rsc_add_column_if_missing` (IN `p_table` VARCHAR(64), IN `p_column` VARCHAR(64), IN `p_def` LONGTEXT)   BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = p_table
+      AND COLUMN_NAME = p_column
+  ) THEN
+    SET @sql = CONCAT('ALTER TABLE `', p_table, '` ADD COLUMN ', p_def);
+    PREPARE stmt FROM @sql;
+    EXECUTE stmt;
+    DEALLOCATE PREPARE stmt;
+  END IF;
+END$$
+
+CREATE DEFINER=`readycr`@`localhost` PROCEDURE `rsc_add_fk_if_missing` (IN `p_table` VARCHAR(64), IN `p_fk_name` VARCHAR(64), IN `p_sql` LONGTEXT)   BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE()
+      AND TABLE_NAME = p_table
+      AND CONSTRAINT_NAME = p_fk_name
+      AND CONSTRAINT_TYPE = 'FOREIGN KEY'
+  ) THEN
+    SET @sql = p_sql;
+    PREPARE stmt FROM @sql;
+    EXECUTE stmt;
+    DEALLOCATE PREPARE stmt;
+  END IF;
+END$$
+
+CREATE DEFINER=`readycr`@`localhost` PROCEDURE `rsc_add_index_if_missing` (IN `p_table` VARCHAR(64), IN `p_index` VARCHAR(64), IN `p_sql` LONGTEXT)   BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM INFORMATION_SCHEMA.STATISTICS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = p_table
+      AND INDEX_NAME = p_index
+  ) THEN
+    SET @sql = p_sql;
+    PREPARE stmt FROM @sql;
+    EXECUTE stmt;
+    DEALLOCATE PREPARE stmt;
+  END IF;
+END$$
+
+CREATE DEFINER=`readycr`@`localhost` PROCEDURE `rsc_add_pk_if_missing` (IN `p_table` VARCHAR(64), IN `p_pk_sql` LONGTEXT)   BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE()
+      AND TABLE_NAME = p_table
+      AND CONSTRAINT_TYPE = 'PRIMARY KEY'
+  ) THEN
+    SET @sql = p_pk_sql;
+    PREPARE stmt FROM @sql;
+    EXECUTE stmt;
+    DEALLOCATE PREPARE stmt;
+  END IF;
+END$$
+
+CREATE DEFINER=`readycr`@`localhost` PROCEDURE `rsc_drop_fk_if_exists` (IN `p_table` VARCHAR(64), IN `p_fk_name` VARCHAR(64))   BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE()
+      AND TABLE_NAME = p_table
+      AND CONSTRAINT_NAME = p_fk_name
+      AND CONSTRAINT_TYPE = 'FOREIGN KEY'
+  ) THEN
+    SET @sql = CONCAT('ALTER TABLE `', p_table, '` DROP FOREIGN KEY `', p_fk_name, '`');
+    PREPARE stmt FROM @sql;
+    EXECUTE stmt;
+    DEALLOCATE PREPARE stmt;
+  END IF;
+END$$
+
 $$
 
 $$
@@ -108,7 +185,24 @@ INSERT INTO `activity_logs` (`id`, `user_id`, `action`, `table_name`, `record_id
 (51, 1, 'create_project', 'projects', 1, NULL, NULL, NULL, '2.180.39.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', '2026-02-12 14:45:26'),
 (52, 1, 'login', 'users', 1, NULL, NULL, NULL, '5.125.56.188', 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36', '2026-02-12 17:25:51'),
 (53, 1, 'login', 'users', 1, NULL, NULL, NULL, '77.237.184.146', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', '2026-02-13 14:39:15'),
-(54, 1, 'login', 'users', 1, NULL, NULL, NULL, '2.180.39.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', '2026-02-14 08:26:06');
+(54, 1, 'login', 'users', 1, NULL, NULL, NULL, '2.180.39.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', '2026-02-14 08:26:06'),
+(55, 1, 'login', 'users', 1, NULL, NULL, NULL, '5.125.56.188', 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36', '2026-02-14 10:33:39'),
+(56, 1, 'login', 'users', 1, NULL, NULL, NULL, '185.246.152.15', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', '2026-02-14 13:39:09'),
+(57, 1, 'update_chatbot_settings', 'settings', NULL, NULL, NULL, NULL, '185.246.152.15', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', '2026-02-14 13:53:14'),
+(58, 1, 'update_chatbot_settings', 'settings', NULL, NULL, NULL, NULL, '185.246.152.15', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', '2026-02-14 13:53:42'),
+(59, 1, 'update_chatbot_settings', 'settings', NULL, NULL, NULL, NULL, '185.246.152.15', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', '2026-02-14 13:54:02'),
+(60, 1, 'update_chatbot_settings', 'settings', NULL, NULL, NULL, NULL, '185.246.152.15', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', '2026-02-14 13:54:35'),
+(61, 1, 'login', 'users', 1, NULL, NULL, NULL, '95.173.219.13', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', '2026-02-14 14:43:21'),
+(62, 1, 'login', 'users', 1, NULL, NULL, NULL, '5.125.56.188', 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36', '2026-02-14 15:37:25'),
+(63, 1, 'login', 'users', 1, NULL, NULL, NULL, '206.217.143.133', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', '2026-02-14 20:13:40'),
+(64, 1, 'login', 'users', 1, NULL, NULL, NULL, '206.217.143.133', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', '2026-02-14 20:31:54'),
+(65, 1, 'login', 'users', 1, NULL, NULL, NULL, '104.28.241.110', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', '2026-02-14 23:04:09'),
+(66, 1, 'login', 'users', 1, NULL, NULL, NULL, '5.125.56.188', 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36', '2026-02-14 23:27:41'),
+(67, 1, 'login', 'users', 1, NULL, NULL, NULL, '2.180.39.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', '2026-02-15 06:02:33'),
+(68, 1, 'login', 'users', 1, NULL, NULL, NULL, '2.180.39.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', '2026-02-15 07:07:44'),
+(69, 1, 'login', 'users', 1, NULL, NULL, NULL, '5.126.126.165', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', '2026-02-15 14:37:15'),
+(70, 1, 'login', 'users', 1, NULL, NULL, NULL, '5.126.126.165', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', '2026-02-15 16:15:20'),
+(71, 1, 'login', 'users', 1, NULL, NULL, NULL, '2.180.39.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', '2026-02-16 11:03:31');
 
 -- --------------------------------------------------------
 
@@ -177,9 +271,9 @@ CREATE TABLE `chatbot_settings` (
 
 INSERT INTO `chatbot_settings` (`id`, `setting_key`, `setting_value`, `setting_type`, `description`, `is_encrypted`, `created_at`, `updated_at`) VALUES
 (1, 'chatbot_enabled', '1', 'boolean', 'فعال/غیرفعال بودن چت‌بات', 0, '2026-02-11 18:34:12', '2026-02-11 18:34:12'),
-(2, 'chatbot_api_key', '', 'string', 'کلید API سرویس GapGPT', 1, '2026-02-11 18:34:12', '2026-02-11 18:34:12'),
+(2, 'sk-hbMtHNYeVjNbgMQp4IxH8ZgydqvKH8wjDCAFYLJze2I9VLXn', '', 'string', 'کلید API سرویس GapGPT', 1, '2026-02-11 18:34:12', '2026-02-14 13:53:38'),
 (3, 'chatbot_model', 'deepseek-r1-671b', 'string', 'مدل پیش‌فرض AI', 0, '2026-02-11 18:34:12', '2026-02-11 18:34:12'),
-(4, 'chatbot_temperature', '0.7', 'string', 'Temperature (0.0 - 1.0)', 0, '2026-02-11 18:34:12', '2026-02-11 18:34:12'),
+(4, 'chatbot_temperature', '0', 'string', 'Temperature (0.0 - 1.0)', 0, '2026-02-11 18:34:12', '2026-02-14 13:54:13'),
 (5, 'chatbot_max_tokens', '2048', 'integer', 'حداکثر توکن پاسخ', 0, '2026-02-11 18:34:12', '2026-02-11 18:34:12'),
 (6, 'chatbot_system_prompt', 'شما یک دستیار هوشمند CRM هستید که به فارسی پاسخ می‌دهید. وظیفه شما کمک به کاربران در تحلیل داده‌ها، گزارش‌گیری، مدیریت مشتریان و لیدها است. همیشه پاسخ‌های دقیق و کاربردی بدهید.', 'string', 'پرامپت سیستمی چت‌بات', 0, '2026-02-11 18:34:12', '2026-02-11 18:34:12'),
 (7, 'chatbot_role_access', 'admin,manager', 'string', 'نقش‌های مجاز (CSV)', 0, '2026-02-11 18:34:12', '2026-02-11 18:34:12'),
@@ -269,6 +363,20 @@ CREATE TABLE `customer_activities` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `dm_pairs`
+--
+
+CREATE TABLE `dm_pairs` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `user_a` int(11) NOT NULL,
+  `user_b` int(11) NOT NULL,
+  `room_id` int(10) UNSIGNED NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `files`
 --
 
@@ -325,6 +433,35 @@ INSERT INTO `leads` (`id`, `title`, `first_name`, `last_name`, `email`, `phone`,
 (3, 'مدیر عامل', 'کامران', 'احمدی', 'kamran@alborz.com', '09167778899', 'گروه صنعتی البرز', NULL, 'email', 'qualified', 'high', 0.00, 0, NULL, 3, 'درخواست دمو محصول', NULL, NULL, 1, '2025-12-23 10:07:43', '2026-01-12 10:07:43'),
 (4, 'مدیر بازاریابی', 'لیلا', 'محمدی', 'leila@pars.com', '09155443322', 'شرکت بازرگانی پارس', NULL, 'social', 'proposal', 'medium', 0.00, 0, NULL, 3, 'جلسه برای ارائه قیمت', NULL, NULL, 1, '2026-01-04 10:07:43', '2026-01-12 10:07:43'),
 (5, 'مدیر فنی', 'امین', 'کریمی', 'amin@rayan.ir', '09188776655', 'شرکت نرم‌افزاری رایان', NULL, 'referral', 'won', 'low', 0.00, 0, NULL, 3, 'قرارداد منعقد شده', NULL, NULL, 1, '2026-01-07 10:07:43', '2026-01-12 10:07:43');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `messages`
+--
+
+CREATE TABLE `messages` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `room_id` int(10) UNSIGNED NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `body` text NOT NULL,
+  `message_type` enum('text','system','notice','instruction','warning') NOT NULL DEFAULT 'text',
+  `upload_id` bigint(20) UNSIGNED DEFAULT NULL,
+  `meta_json` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`meta_json`)),
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `edited_at` datetime DEFAULT NULL,
+  `deleted_at` datetime DEFAULT NULL,
+  `deleted_by` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `messages`
+--
+
+INSERT INTO `messages` (`id`, `room_id`, `user_id`, `body`, `message_type`, `upload_id`, `meta_json`, `created_at`, `edited_at`, `deleted_at`, `deleted_by`) VALUES
+(1, 1, 1, 'تست', 'text', NULL, NULL, '2026-02-14 15:21:29', NULL, NULL, NULL),
+(2, 1, 1, 'سلام دوستان', 'text', NULL, NULL, '2026-02-14 20:40:40', NULL, NULL, NULL),
+(3, 1, 1, 'یو یو', 'text', NULL, NULL, '2026-02-14 21:10:23', NULL, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -516,6 +653,202 @@ CREATE TABLE `project_milestones` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `rooms`
+--
+
+CREATE TABLE `rooms` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `name` varchar(64) NOT NULL,
+  `description` varchar(240) NOT NULL DEFAULT '',
+  `avatar_path` varchar(255) NOT NULL DEFAULT '',
+  `type` enum('group','channel','dm') NOT NULL DEFAULT 'group',
+  `visibility` enum('public','private') NOT NULL DEFAULT 'public',
+  `is_readonly` tinyint(1) NOT NULL DEFAULT 0,
+  `created_by` int(10) UNSIGNED DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NULL DEFAULT NULL ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `rooms`
+--
+
+INSERT INTO `rooms` (`id`, `name`, `description`, `avatar_path`, `type`, `visibility`, `is_readonly`, `created_by`, `created_at`, `updated_at`) VALUES
+(1, 'گروه عمومی', '', '', 'group', 'public', 0, NULL, '2026-02-14 13:40:22', NULL),
+(2, 'کانال اطلاع‌رسانی', '', '', 'channel', 'public', 1, NULL, '2026-02-14 13:40:22', NULL);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `room_members`
+--
+
+CREATE TABLE `room_members` (
+  `room_id` int(10) UNSIGNED NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `member_role` enum('owner','admin','member') NOT NULL DEFAULT 'member',
+  `is_muted` tinyint(1) NOT NULL DEFAULT 0,
+  `mute_until` datetime DEFAULT NULL,
+  `is_pinned` tinyint(1) NOT NULL DEFAULT 0,
+  `joined_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `added_by` int(11) DEFAULT NULL,
+  `last_read_message_id` bigint(20) DEFAULT NULL,
+  `last_read_at` datetime DEFAULT NULL,
+  `left_at` datetime DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `rsc_admin_audit_logs`
+--
+
+CREATE TABLE `rsc_admin_audit_logs` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `actor_user_id` int(11) DEFAULT NULL,
+  `action` varchar(80) NOT NULL,
+  `entity_type` varchar(40) NOT NULL,
+  `entity_id` bigint(20) UNSIGNED DEFAULT NULL,
+  `meta_json` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`meta_json`)),
+  `ip_address` varchar(45) DEFAULT NULL,
+  `user_agent` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `rsc_chat_settings`
+--
+
+CREATE TABLE `rsc_chat_settings` (
+  `id` tinyint(3) UNSIGNED NOT NULL DEFAULT 1,
+  `max_upload_mb` int(10) UNSIGNED NOT NULL DEFAULT 20,
+  `enable_channels` tinyint(1) NOT NULL DEFAULT 1,
+  `enable_dm` tinyint(1) NOT NULL DEFAULT 1,
+  `retention_days` int(10) UNSIGNED NOT NULL DEFAULT 0 COMMENT '0=نامحدود',
+  `allow_group_create_roles_json` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL CHECK (json_valid(`allow_group_create_roles_json`)),
+  `updated_by` int(11) DEFAULT NULL,
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `rsc_chat_settings`
+--
+
+INSERT INTO `rsc_chat_settings` (`id`, `max_upload_mb`, `enable_channels`, `enable_dm`, `retention_days`, `allow_group_create_roles_json`, `updated_by`, `updated_at`) VALUES
+(1, 20, 1, 1, 0, '[\"admin\", \"manager\"]', NULL, '2026-02-14 22:24:16');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `rsc_message_templates`
+--
+
+CREATE TABLE `rsc_message_templates` (
+  `id` int(11) NOT NULL,
+  `type` enum('notice','instruction','warning','system') NOT NULL DEFAULT 'notice',
+  `title` varchar(120) NOT NULL,
+  `body` text NOT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NULL DEFAULT NULL ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `rsc_permissions`
+--
+
+CREATE TABLE `rsc_permissions` (
+  `id` int(11) NOT NULL,
+  `key` varchar(80) NOT NULL,
+  `title` varchar(120) NOT NULL,
+  `group_key` varchar(60) NOT NULL DEFAULT 'general',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `rsc_permissions`
+--
+
+INSERT INTO `rsc_permissions` (`id`, `key`, `title`, `group_key`, `created_at`) VALUES
+(1, 'chat.view', 'مشاهده پیام‌رسان', 'core', '2026-02-14 22:24:16'),
+(2, 'chat.dm.start', 'شروع چت جدید', 'core', '2026-02-14 22:24:16'),
+(3, 'chat.users.list', 'مشاهده لیست کاربران', 'core', '2026-02-14 22:24:16'),
+(4, 'chat.profile.update', 'ویرایش پروفایل/آواتار', 'core', '2026-02-14 22:24:16'),
+(5, 'room.create', 'ساخت گروه/اتاق', 'rooms', '2026-02-14 22:24:16'),
+(6, 'room.update', 'ویرایش اطلاعات گروه/اتاق', 'rooms', '2026-02-14 22:24:16'),
+(7, 'room.delete', 'حذف گروه/اتاق', 'rooms', '2026-02-14 22:24:16'),
+(8, 'room.members.list', 'مشاهده اعضای گروه', 'rooms', '2026-02-14 22:24:16'),
+(9, 'room.members.add', 'افزودن عضو به گروه', 'rooms', '2026-02-14 22:24:16'),
+(10, 'room.members.remove', 'حذف عضو از گروه', 'rooms', '2026-02-14 22:24:16'),
+(11, 'room.visibility.set', 'تنظیم عمومی/خصوصی', 'rooms', '2026-02-14 22:24:16'),
+(12, 'room.desc.set', 'ثبت/ویرایش توضیحات', 'rooms', '2026-02-14 22:24:16'),
+(13, 'admin.stats.view', 'مشاهده آمار پیام‌رسان', 'admin', '2026-02-14 22:24:16'),
+(14, 'admin.settings.manage', 'مدیریت تنظیمات پیام‌رسان', 'admin', '2026-02-14 22:24:16'),
+(15, 'admin.templates.manage', 'مدیریت قالب‌های پیام', 'admin', '2026-02-14 22:24:16'),
+(16, 'admin.users.manage', 'مدیریت کاربران پیام‌رسان', 'admin', '2026-02-14 22:24:16'),
+(17, 'admin.rooms.manage', 'مدیریت اتاق‌ها', 'admin', '2026-02-14 22:24:16');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `rsc_roles`
+--
+
+CREATE TABLE `rsc_roles` (
+  `id` int(11) NOT NULL,
+  `key` varchar(50) NOT NULL,
+  `title` varchar(80) NOT NULL,
+  `is_system` tinyint(1) NOT NULL DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `rsc_role_permissions`
+--
+
+CREATE TABLE `rsc_role_permissions` (
+  `role_id` int(11) NOT NULL,
+  `permission_id` int(11) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `rsc_user_presence`
+--
+
+CREATE TABLE `rsc_user_presence` (
+  `user_id` int(11) NOT NULL,
+  `status` enum('online','away','busy','offline') NOT NULL DEFAULT 'offline',
+  `last_seen_at` datetime NOT NULL,
+  `last_ip` varchar(45) NOT NULL DEFAULT '',
+  `user_agent` varchar(255) NOT NULL DEFAULT '',
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `rsc_user_roles`
+--
+
+CREATE TABLE `rsc_user_roles` (
+  `user_id` int(11) NOT NULL,
+  `role_id` int(11) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `sales`
 --
 
@@ -616,14 +949,15 @@ INSERT INTO `settings` (`id`, `setting_key`, `setting_value`, `setting_type`, `d
 (13, 'mail_from_name', 'سی آر ام انتخاب', 'string', NULL, '2026-02-03 12:54:17', '2026-02-03 12:54:17'),
 (14, 'mail_encryption', 'tls', 'string', NULL, '2026-02-03 12:54:17', '2026-02-03 12:54:17'),
 (22, 'chatbot_api_key', 'sk-hbMtHNYeVjNbgMQp4IxH8ZgydqvKH8wjDCAFYLJze2I9VLXn', 'string', NULL, '2026-02-11 18:19:32', '2026-02-11 18:19:32'),
-(23, 'chatbot_model', 'gpt-4o-mini', 'string', NULL, '2026-02-11 18:19:32', '2026-02-11 18:19:32'),
+(23, 'chatbot_model', 'deepseek-v3', 'string', NULL, '2026-02-11 18:19:32', '2026-02-14 13:53:14'),
 (24, 'chatbot_enabled', '1', 'string', NULL, '2026-02-11 18:19:32', '2026-02-11 18:19:32'),
-(25, 'chatbot_temperature', '0.7', 'string', NULL, '2026-02-11 18:19:32', '2026-02-11 18:19:32'),
-(26, 'chatbot_max_tokens', '2000', 'string', NULL, '2026-02-11 18:19:32', '2026-02-11 18:19:32'),
-(27, 'chatbot_context_messages', '10', 'string', NULL, '2026-02-11 18:19:32', '2026-02-11 18:19:32'),
+(25, 'chatbot_temperature', '0', 'string', NULL, '2026-02-11 18:19:32', '2026-02-14 13:53:14'),
+(26, 'chatbot_max_tokens', '1200', 'string', NULL, '2026-02-11 18:19:32', '2026-02-14 13:53:14'),
+(27, 'chatbot_context_messages', '50', 'string', NULL, '2026-02-11 18:19:32', '2026-02-14 13:53:14'),
 (28, 'chatbot_role_admin', '1', 'string', NULL, '2026-02-11 18:19:32', '2026-02-11 18:19:32'),
 (29, 'chatbot_role_manager', '1', 'string', NULL, '2026-02-11 18:19:32', '2026-02-11 18:19:32'),
-(30, 'chatbot_role_user', '1', 'string', NULL, '2026-02-11 18:19:32', '2026-02-11 18:19:32');
+(30, 'chatbot_role_user', '1', 'string', NULL, '2026-02-11 18:19:32', '2026-02-11 18:19:32'),
+(42, 'chatbot_system_prompt', 'شما یک دستیار هوشمند CRM هستید که به فارسی پاسخ می‌دهید. وظیفه شما کمک به کاربران در تحلیل داده‌ها، گزارش‌گیری، مدیریت مشتریان و لیدها است. همیشه پاسخ‌های دقیق و کاربردی بدهید.', 'string', NULL, '2026-02-14 13:53:14', '2026-02-14 13:53:14');
 
 -- --------------------------------------------------------
 
@@ -670,9 +1004,11 @@ CREATE TABLE `sms_campaign_recipients` (
   `name` varchar(100) DEFAULT NULL COMMENT 'نام مخاطب (اختیاری)',
   `params` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL COMMENT 'پارامترهای شخصی‌سازی‌شده' CHECK (json_valid(`params`)),
   `status` enum('pending','sent','delivered','failed','cancelled') DEFAULT 'pending' COMMENT 'وضعیت ارسال',
+  `retry_count` tinyint(3) UNSIGNED DEFAULT 0,
   `msgway_message_id` varchar(100) DEFAULT NULL COMMENT 'OTPReferenceID از MsgWay',
   `error_message` text DEFAULT NULL COMMENT 'پیام خطا در صورت ناموفق بودن',
   `sent_at` datetime DEFAULT NULL COMMENT 'زمان ارسال',
+  `last_attempt_at` datetime DEFAULT NULL,
   `delivered_at` datetime DEFAULT NULL COMMENT 'زمان تحویل',
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
@@ -703,18 +1039,44 @@ CREATE TABLE `sms_daily_stats` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `sms_event_settings`
+--
+
+CREATE TABLE `sms_event_settings` (
+  `id` int(11) NOT NULL,
+  `event_key` varchar(50) NOT NULL COMMENT 'مانند: user_login, new_sale, task_reminder',
+  `template_id` int(11) DEFAULT NULL COMMENT 'آیدی الگو از جدول sms_templates',
+  `is_enabled` tinyint(1) DEFAULT 1,
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `sms_event_settings`
+--
+
+INSERT INTO `sms_event_settings` (`id`, `event_key`, `template_id`, `is_enabled`, `updated_at`) VALUES
+(1, 'otp_login', 1, 1, '2026-02-16 11:16:05'),
+(2, 'customer_welcome', 3, 1, '2026-02-16 11:16:05'),
+(3, 'task_reminder', 4, 1, '2026-02-16 11:16:05'),
+(4, 'invoice_issued', 5, 1, '2026-02-16 11:16:05');
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `sms_logs`
 --
 
 CREATE TABLE `sms_logs` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `mobile` varchar(20) NOT NULL COMMENT 'شماره موبایل مقصد',
+  `customer_id` int(11) DEFAULT NULL,
   `template_id` int(11) DEFAULT NULL COMMENT 'الگوی استفاده‌شده',
   `campaign_id` int(11) DEFAULT NULL COMMENT 'کمپین مرتبط (در صورت وجود)',
   `msgway_message_id` varchar(100) DEFAULT NULL COMMENT 'OTPReferenceID',
   `send_method` enum('sms','ivr','smart','messenger') DEFAULT 'sms',
   `provider_id` tinyint(3) UNSIGNED DEFAULT NULL,
   `status` enum('pending','sent','delivered','failed') DEFAULT 'pending',
+  `cost` decimal(15,2) DEFAULT 0.00,
   `error_message` text DEFAULT NULL,
   `api_response` longtext DEFAULT NULL COMMENT 'پاسخ خام API (JSON)',
   `sent_at` datetime DEFAULT NULL,
@@ -734,6 +1096,7 @@ CREATE TABLE `sms_templates` (
   `remote_template_id` int(10) UNSIGNED DEFAULT NULL COMMENT 'شناسه الگو در MsgWay',
   `content` text NOT NULL COMMENT 'متن الگو با پارامترها (مثلاً: {1} و {2})',
   `params_count` tinyint(3) UNSIGNED DEFAULT 0 COMMENT 'تعداد پارامترهای الگو',
+  `params_map` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`params_map`)),
   `template_type` enum('otp','notification','marketing','transactional','custom') DEFAULT 'notification' COMMENT 'نوع الگو',
   `method` enum('sms','ivr','smart','messenger') DEFAULT 'sms' COMMENT 'روش ارسال',
   `status` enum('draft','pending','active','rejected','inactive') DEFAULT 'draft' COMMENT 'وضعیت تایید الگو',
@@ -748,12 +1111,12 @@ CREATE TABLE `sms_templates` (
 -- Dumping data for table `sms_templates`
 --
 
-INSERT INTO `sms_templates` (`id`, `name`, `remote_template_id`, `content`, `params_count`, `template_type`, `method`, `status`, `is_system`, `notes`, `created_by`, `created_at`, `updated_at`) VALUES
-(1, 'کد تایید (OTP)', NULL, 'کد تایید شما: {1}', 1, 'otp', 'sms', 'active', 1, NULL, NULL, '2026-02-13 19:06:57', '2026-02-13 19:06:57'),
-(2, 'تماس صوتی (IVR)', 2, 'کد تایید شما از طریق تماس صوتی اعلام می‌شود', 0, 'otp', 'ivr', 'active', 1, NULL, NULL, '2026-02-13 19:06:57', '2026-02-13 19:06:57'),
-(3, 'پیام خوش‌آمدگویی', NULL, 'سلام {1} عزیز، به سیستم CRM خوش آمدید', 1, 'notification', 'sms', 'active', 1, NULL, NULL, '2026-02-13 19:06:57', '2026-02-13 19:06:57'),
-(4, 'یادآور جلسه', NULL, '{1} عزیز، یادآوری جلسه شما در تاریخ {2}', 2, 'notification', 'sms', 'active', 1, NULL, NULL, '2026-02-13 19:06:57', '2026-02-13 19:06:57'),
-(5, 'اطلاع‌رسانی فاکتور', NULL, '{1} عزیز، فاکتور شماره {2} به مبلغ {3} ریال صادر شد', 3, 'transactional', 'sms', 'active', 1, NULL, NULL, '2026-02-13 19:06:57', '2026-02-13 19:06:57');
+INSERT INTO `sms_templates` (`id`, `name`, `remote_template_id`, `content`, `params_count`, `params_map`, `template_type`, `method`, `status`, `is_system`, `notes`, `created_by`, `created_at`, `updated_at`) VALUES
+(1, 'کد تایید (OTP)', NULL, 'کد تایید شما: {1}', 1, '{\"1\": \"کد تایید\"}', 'otp', 'sms', 'active', 1, NULL, NULL, '2026-02-13 19:06:57', '2026-02-16 14:45:36'),
+(2, 'تماس صوتی (IVR)', 2, 'کد تایید شما از طریق تماس صوتی اعلام می‌شود', 0, NULL, 'otp', 'ivr', 'active', 1, NULL, NULL, '2026-02-13 19:06:57', '2026-02-13 19:06:57'),
+(3, 'پیام خوش‌آمدگویی', NULL, 'سلام {1} عزیز، به سیستم CRM خوش آمدید', 1, '{\"1\": \"نام مشتری\"}', 'notification', 'sms', 'active', 1, NULL, NULL, '2026-02-13 19:06:57', '2026-02-16 14:45:36'),
+(4, 'یادآور جلسه', NULL, '{1} عزیز، یادآوری جلسه شما در تاریخ {2}', 2, '{\"1\": \"نام\", \"2\": \"تاریخ جلسه\"}', 'notification', 'sms', 'active', 1, NULL, NULL, '2026-02-13 19:06:57', '2026-02-16 14:45:36'),
+(5, 'اطلاع‌رسانی فاکتور', NULL, '{1} عزیز، فاکتور شماره {2} به مبلغ {3} ریال صادر شد', 3, '{\"1\": \"نام\", \"2\": \"شماره فاکتور\", \"3\": \"مبلغ\"}', 'transactional', 'sms', 'active', 1, NULL, NULL, '2026-02-13 19:06:57', '2026-02-16 14:45:36');
 
 --
 -- Triggers `sms_templates`
@@ -827,6 +1190,27 @@ CREATE TABLE `task_subtasks` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `uploads`
+--
+
+CREATE TABLE `uploads` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `room_id` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `stored_name` varchar(128) NOT NULL,
+  `storage_path` varchar(255) NOT NULL DEFAULT '',
+  `original_name` varchar(255) NOT NULL,
+  `mime` varchar(96) NOT NULL,
+  `size_bytes` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `sha256` char(64) NOT NULL DEFAULT '',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT 0,
+  `deleted_at` datetime DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `users`
 --
 
@@ -860,11 +1244,32 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `username`, `email`, `password`, `first_name`, `last_name`, `mobile`, `phone`, `avatar`, `role`, `status`, `department`, `position`, `hire_date`, `salary`, `address`, `notes`, `last_login`, `failed_login_attempts`, `locked_until`, `created_at`, `updated_at`) VALUES
-(1, 'admin', 'ghaemipm@gmail.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'فاضل', 'قائمی', '09159040610', '05136161122', NULL, 'admin', 'active', 'مدیریت', 'مدیر عامل', '2020-01-15', 25000000.00, 'ایران، مشهد', 'مدیر کل سیستم', '2026-02-14 11:56:06', 0, NULL, '2026-01-12 10:07:43', '2026-02-14 08:26:06'),
+(1, 'admin', 'ghaemipm@gmail.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'فاضل', 'قائمی', '09159040610', '05136161122', NULL, 'admin', 'active', 'مدیریت', 'مدیر عامل', '2020-01-15', 25000000.00, 'ایران، مشهد', 'مدیر کل سیستم', '2026-02-16 14:33:31', 0, NULL, '2026-01-12 10:07:43', '2026-02-16 11:03:31'),
 (2, 'manager', 'manager@crm.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'سارا', 'محمدی', '09129876543', '02188776656', NULL, 'manager', 'active', 'فروش', 'مدیر فروش', '2021-03-10', 18000000.00, 'تهران، انقلاب، پلاک 456', 'مدیر بخش فروش', NULL, 0, NULL, '2026-01-12 10:07:43', '2026-01-12 10:07:43'),
 (3, 'sales1', 'sales@crm.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'رضا', 'کریمی', '09112345678', '02188776657', NULL, 'sales', 'active', 'فروش', 'کارشناس فروش', '2022-06-20', 12000000.00, 'تهران، کریمخان، پلاک 789', 'کارشناس فروش ارشد', NULL, 0, NULL, '2026-01-12 10:07:43', '2026-01-12 10:07:43'),
 (4, 'user1', 'user@crm.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'مریم', 'حسینی', '09198765432', '02188776658', NULL, 'user', 'active', 'پشتیبانی', 'کارشناس پشتیبانی', '2023-01-05', 10000000.00, 'تهران، شریعتی، پلاک 321', 'کارشناس پشتیبانی مشتریان', NULL, 0, NULL, '2026-01-12 10:07:43', '2026-01-12 10:07:43'),
 (5, 'ehsanfast', 'ehsanfast@gmail.com', '$2y$10$NJllN9ycdwABWHE7NojEUOX/fpBy4wgEFxCXrMzoirAZxklhIw7Ua', 'احسان', 'ثابت مشمول', '09356167766', '', NULL, 'manager', 'active', 'محصول', 'مدیر محصول', '2026-02-03', 50000000.00, 'ایران، مشهد', '', NULL, 0, NULL, '2026-02-03 10:56:40', '2026-02-03 10:56:40');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `user_profiles`
+--
+
+CREATE TABLE `user_profiles` (
+  `user_id` int(11) NOT NULL,
+  `display_name` varchar(64) NOT NULL DEFAULT '',
+  `bio` varchar(160) NOT NULL DEFAULT '',
+  `avatar_path` varchar(255) NOT NULL DEFAULT '',
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `user_profiles`
+--
+
+INSERT INTO `user_profiles` (`user_id`, `display_name`, `bio`, `avatar_path`, `updated_at`) VALUES
+(1, 'فاضل قائمی', '', '', '2026-02-14 14:43:21');
 
 --
 -- Indexes for dumped tables
@@ -939,6 +1344,15 @@ ALTER TABLE `customer_activities`
   ADD KEY `created_by` (`created_by`);
 
 --
+-- Indexes for table `dm_pairs`
+--
+ALTER TABLE `dm_pairs`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_pair` (`user_a`,`user_b`),
+  ADD KEY `user_b` (`user_b`),
+  ADD KEY `room_id` (`room_id`);
+
+--
 -- Indexes for table `files`
 --
 ALTER TABLE `files`
@@ -955,6 +1369,16 @@ ALTER TABLE `leads`
   ADD KEY `idx_leads_phone` (`phone`),
   ADD KEY `idx_leads_status` (`status`),
   ADD KEY `idx_leads_assigned_to` (`assigned_to`);
+
+--
+-- Indexes for table `messages`
+--
+ALTER TABLE `messages`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_messages_room_created` (`room_id`,`created_at`),
+  ADD KEY `idx_messages_user_created` (`user_id`,`created_at`),
+  ADD KEY `idx_messages_upload` (`upload_id`),
+  ADD KEY `idx_messages_deleted_at` (`deleted_at`);
 
 --
 -- Indexes for table `msgway_config`
@@ -1015,6 +1439,89 @@ ALTER TABLE `project_milestones`
   ADD KEY `fk_milestone_project` (`project_id`);
 
 --
+-- Indexes for table `rooms`
+--
+ALTER TABLE `rooms`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `type` (`type`),
+  ADD KEY `idx_rooms_visibility` (`visibility`),
+  ADD KEY `idx_rooms_created_by` (`created_by`),
+  ADD KEY `idx_rooms_type_visibility` (`type`,`visibility`);
+
+--
+-- Indexes for table `room_members`
+--
+ALTER TABLE `room_members`
+  ADD PRIMARY KEY (`room_id`,`user_id`),
+  ADD KEY `idx_rm_user` (`user_id`),
+  ADD KEY `idx_rm_room` (`room_id`),
+  ADD KEY `idx_rm_role` (`member_role`),
+  ADD KEY `idx_rm_last_read` (`room_id`,`last_read_message_id`),
+  ADD KEY `idx_rm_added_by` (`added_by`),
+  ADD KEY `idx_rm_lastread` (`room_id`,`last_read_message_id`);
+
+--
+-- Indexes for table `rsc_admin_audit_logs`
+--
+ALTER TABLE `rsc_admin_audit_logs`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_rsc_audit_actor` (`actor_user_id`),
+  ADD KEY `idx_rsc_audit_entity` (`entity_type`,`entity_id`);
+
+--
+-- Indexes for table `rsc_chat_settings`
+--
+ALTER TABLE `rsc_chat_settings`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_rsc_settings_updated_by` (`updated_by`);
+
+--
+-- Indexes for table `rsc_message_templates`
+--
+ALTER TABLE `rsc_message_templates`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_rsc_tpl_type` (`type`),
+  ADD KEY `idx_rsc_tpl_active` (`is_active`),
+  ADD KEY `fk_rsc_tpl_created_by` (`created_by`);
+
+--
+-- Indexes for table `rsc_permissions`
+--
+ALTER TABLE `rsc_permissions`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_rsc_permissions_key` (`key`),
+  ADD KEY `idx_rsc_permissions_group` (`group_key`);
+
+--
+-- Indexes for table `rsc_roles`
+--
+ALTER TABLE `rsc_roles`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_rsc_roles_key` (`key`);
+
+--
+-- Indexes for table `rsc_role_permissions`
+--
+ALTER TABLE `rsc_role_permissions`
+  ADD PRIMARY KEY (`role_id`,`permission_id`),
+  ADD KEY `fk_rsc_rp_perm` (`permission_id`);
+
+--
+-- Indexes for table `rsc_user_presence`
+--
+ALTER TABLE `rsc_user_presence`
+  ADD PRIMARY KEY (`user_id`),
+  ADD KEY `idx_rsc_presence_status` (`status`),
+  ADD KEY `idx_rsc_presence_last_seen` (`last_seen_at`);
+
+--
+-- Indexes for table `rsc_user_roles`
+--
+ALTER TABLE `rsc_user_roles`
+  ADD PRIMARY KEY (`user_id`,`role_id`),
+  ADD KEY `fk_rsc_ur_role` (`role_id`);
+
+--
 -- Indexes for table `sales`
 --
 ALTER TABLE `sales`
@@ -1059,7 +1566,8 @@ ALTER TABLE `sms_campaign_recipients`
   ADD UNIQUE KEY `uk_campaign_mobile` (`campaign_id`,`mobile`),
   ADD KEY `idx_recipient_status` (`status`,`sent_at`),
   ADD KEY `idx_recipient_msgway` (`msgway_message_id`),
-  ADD KEY `idx_recipient_mobile` (`mobile`);
+  ADD KEY `idx_recipient_mobile` (`mobile`),
+  ADD KEY `idx_recipients_retry_status` (`status`,`retry_count`);
 
 --
 -- Indexes for table `sms_daily_stats`
@@ -1067,6 +1575,14 @@ ALTER TABLE `sms_campaign_recipients`
 ALTER TABLE `sms_daily_stats`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `uk_stat_date` (`stat_date`);
+
+--
+-- Indexes for table `sms_event_settings`
+--
+ALTER TABLE `sms_event_settings`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uk_event_key` (`event_key`),
+  ADD KEY `fk_event_template` (`template_id`);
 
 --
 -- Indexes for table `sms_logs`
@@ -1077,7 +1593,8 @@ ALTER TABLE `sms_logs`
   ADD KEY `idx_log_status` (`status`,`sent_at`),
   ADD KEY `idx_log_msgway` (`msgway_message_id`),
   ADD KEY `idx_log_template` (`template_id`),
-  ADD KEY `idx_log_campaign` (`campaign_id`);
+  ADD KEY `idx_log_campaign` (`campaign_id`),
+  ADD KEY `idx_sms_logs_customer_date` (`customer_id`,`created_at`);
 
 --
 -- Indexes for table `sms_templates`
@@ -1113,12 +1630,26 @@ ALTER TABLE `task_subtasks`
   ADD KEY `task_id` (`task_id`);
 
 --
+-- Indexes for table `uploads`
+--
+ALTER TABLE `uploads`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_uploads_room_created` (`room_id`,`created_at`),
+  ADD KEY `idx_uploads_user_created` (`user_id`,`created_at`);
+
+--
 -- Indexes for table `users`
 --
 ALTER TABLE `users`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `username` (`username`),
   ADD UNIQUE KEY `email` (`email`);
+
+--
+-- Indexes for table `user_profiles`
+--
+ALTER TABLE `user_profiles`
+  ADD PRIMARY KEY (`user_id`);
 
 --
 -- AUTO_INCREMENT for dumped tables
@@ -1128,7 +1659,7 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `activity_logs`
 --
 ALTER TABLE `activity_logs`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=55;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=72;
 
 --
 -- AUTO_INCREMENT for table `chatbot_conversations`
@@ -1167,6 +1698,12 @@ ALTER TABLE `customer_activities`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT for table `dm_pairs`
+--
+ALTER TABLE `dm_pairs`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `files`
 --
 ALTER TABLE `files`
@@ -1177,6 +1714,12 @@ ALTER TABLE `files`
 --
 ALTER TABLE `leads`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+
+--
+-- AUTO_INCREMENT for table `messages`
+--
+ALTER TABLE `messages`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT for table `password_reset_tokens`
@@ -1215,6 +1758,36 @@ ALTER TABLE `project_milestones`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT for table `rooms`
+--
+ALTER TABLE `rooms`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+
+--
+-- AUTO_INCREMENT for table `rsc_admin_audit_logs`
+--
+ALTER TABLE `rsc_admin_audit_logs`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `rsc_message_templates`
+--
+ALTER TABLE `rsc_message_templates`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `rsc_permissions`
+--
+ALTER TABLE `rsc_permissions`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=18;
+
+--
+-- AUTO_INCREMENT for table `rsc_roles`
+--
+ALTER TABLE `rsc_roles`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `sales`
 --
 ALTER TABLE `sales`
@@ -1230,7 +1803,7 @@ ALTER TABLE `sale_items`
 -- AUTO_INCREMENT for table `settings`
 --
 ALTER TABLE `settings`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=33;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=73;
 
 --
 -- AUTO_INCREMENT for table `sms_campaigns`
@@ -1249,6 +1822,12 @@ ALTER TABLE `sms_campaign_recipients`
 --
 ALTER TABLE `sms_daily_stats`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `sms_event_settings`
+--
+ALTER TABLE `sms_event_settings`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `sms_logs`
@@ -1273,6 +1852,12 @@ ALTER TABLE `tasks`
 --
 ALTER TABLE `task_subtasks`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `uploads`
+--
+ALTER TABLE `uploads`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `users`
@@ -1317,6 +1902,14 @@ ALTER TABLE `customer_activities`
   ADD CONSTRAINT `customer_activities_ibfk_2` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
 
 --
+-- Constraints for table `dm_pairs`
+--
+ALTER TABLE `dm_pairs`
+  ADD CONSTRAINT `dm_pairs_ibfk_1` FOREIGN KEY (`user_a`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `dm_pairs_ibfk_2` FOREIGN KEY (`user_b`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `dm_pairs_ibfk_3` FOREIGN KEY (`room_id`) REFERENCES `rooms` (`id`) ON DELETE CASCADE;
+
+--
 -- Constraints for table `files`
 --
 ALTER TABLE `files`
@@ -1328,6 +1921,17 @@ ALTER TABLE `files`
 ALTER TABLE `leads`
   ADD CONSTRAINT `leads_ibfk_1` FOREIGN KEY (`assigned_to`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   ADD CONSTRAINT `leads_ibfk_2` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `messages`
+--
+ALTER TABLE `messages`
+  ADD CONSTRAINT `fk_msg_room` FOREIGN KEY (`room_id`) REFERENCES `rooms` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_msg_upload` FOREIGN KEY (`upload_id`) REFERENCES `uploads` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_msg_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  ADD CONSTRAINT `messages_ibfk_1` FOREIGN KEY (`room_id`) REFERENCES `rooms` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `messages_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `messages_ibfk_3` FOREIGN KEY (`upload_id`) REFERENCES `uploads` (`id`) ON DELETE SET NULL;
 
 --
 -- Constraints for table `password_reset_tokens`
@@ -1362,6 +1966,52 @@ ALTER TABLE `project_milestones`
   ADD CONSTRAINT `fk_milestone_project` FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`) ON DELETE CASCADE;
 
 --
+-- Constraints for table `room_members`
+--
+ALTER TABLE `room_members`
+  ADD CONSTRAINT `fk_rm_added_by` FOREIGN KEY (`added_by`) REFERENCES `users` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_rm_room` FOREIGN KEY (`room_id`) REFERENCES `rooms` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_rm_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+--
+-- Constraints for table `rsc_admin_audit_logs`
+--
+ALTER TABLE `rsc_admin_audit_logs`
+  ADD CONSTRAINT `fk_rsc_audit_actor` FOREIGN KEY (`actor_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+--
+-- Constraints for table `rsc_chat_settings`
+--
+ALTER TABLE `rsc_chat_settings`
+  ADD CONSTRAINT `fk_rsc_settings_updated_by` FOREIGN KEY (`updated_by`) REFERENCES `users` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+--
+-- Constraints for table `rsc_message_templates`
+--
+ALTER TABLE `rsc_message_templates`
+  ADD CONSTRAINT `fk_rsc_tpl_created_by` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+--
+-- Constraints for table `rsc_role_permissions`
+--
+ALTER TABLE `rsc_role_permissions`
+  ADD CONSTRAINT `fk_rsc_rp_perm` FOREIGN KEY (`permission_id`) REFERENCES `rsc_permissions` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_rsc_rp_role` FOREIGN KEY (`role_id`) REFERENCES `rsc_roles` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+--
+-- Constraints for table `rsc_user_presence`
+--
+ALTER TABLE `rsc_user_presence`
+  ADD CONSTRAINT `fk_rsc_presence_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+--
+-- Constraints for table `rsc_user_roles`
+--
+ALTER TABLE `rsc_user_roles`
+  ADD CONSTRAINT `fk_rsc_ur_role` FOREIGN KEY (`role_id`) REFERENCES `rsc_roles` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_rsc_ur_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+--
 -- Constraints for table `sales`
 --
 ALTER TABLE `sales`
@@ -1390,11 +2040,18 @@ ALTER TABLE `sms_campaign_recipients`
   ADD CONSTRAINT `fk_recipient_campaign` FOREIGN KEY (`campaign_id`) REFERENCES `sms_campaigns` (`id`) ON DELETE CASCADE;
 
 --
+-- Constraints for table `sms_event_settings`
+--
+ALTER TABLE `sms_event_settings`
+  ADD CONSTRAINT `fk_event_template` FOREIGN KEY (`template_id`) REFERENCES `sms_templates` (`id`) ON DELETE SET NULL;
+
+--
 -- Constraints for table `sms_logs`
 --
 ALTER TABLE `sms_logs`
   ADD CONSTRAINT `fk_log_campaign` FOREIGN KEY (`campaign_id`) REFERENCES `sms_campaigns` (`id`) ON DELETE SET NULL,
-  ADD CONSTRAINT `fk_log_template` FOREIGN KEY (`template_id`) REFERENCES `sms_templates` (`id`) ON DELETE SET NULL;
+  ADD CONSTRAINT `fk_log_template` FOREIGN KEY (`template_id`) REFERENCES `sms_templates` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_sms_log_customer` FOREIGN KEY (`customer_id`) REFERENCES `customers` (`id`) ON DELETE SET NULL;
 
 --
 -- Constraints for table `sms_templates`
@@ -1415,6 +2072,18 @@ ALTER TABLE `tasks`
 --
 ALTER TABLE `task_subtasks`
   ADD CONSTRAINT `task_subtasks_ibfk_1` FOREIGN KEY (`task_id`) REFERENCES `tasks` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `uploads`
+--
+ALTER TABLE `uploads`
+  ADD CONSTRAINT `uploads_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `user_profiles`
+--
+ALTER TABLE `user_profiles`
+  ADD CONSTRAINT `user_profiles_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
