@@ -97,6 +97,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         
+                if ($action === 'msgway_settings') {
+            $msgway_settings = [
+                'msgway_api_key' => sanitizeInput($_POST['msgway_api_key']),
+                'msgway_line_number' => sanitizeInput($_POST['msgway_line_number']),
+                'msgway_otp_length' => (int)$_POST['msgway_otp_length'],
+                'msgway_otp_expire_time' => (int)$_POST['msgway_otp_expire_time'],
+                'msgway_send_method' => sanitizeInput($_POST['msgway_send_method']),
+                'msgway_otp_template_id' => (int)$_POST['msgway_otp_template_id'],
+                'msgway_resend_delay' => (int)$_POST['msgway_resend_delay'],
+                'msgway_mobile_format' => sanitizeInput($_POST['msgway_mobile_format']),
+                'msgway_enabled' => isset($_POST['msgway_enabled']) ? 1 : 0
+            ];
+
+            try {
+                $pdo->beginTransaction();
+
+                foreach ($msgway_settings as $key => $value) {
+                    $stmt = $pdo->prepare("
+                        INSERT INTO settings (setting_key, setting_value)
+                        VALUES (?, ?)
+                        ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)
+                    ");
+                    $stmt->execute([$key, $value]);
+                }
+
+                $pdo->commit();
+                logActivity($_SESSION['user_id'], 'update_msgway_settings', 'settings', null);
+                setMessage('تنظیمات راه پیام با موفقیت بروزرسانی شد', 'success');
+
+            } catch (PDOException $e) {
+                $pdo->rollback();
+                error_log("خطا در بروزرسانی تنظیمات راه پیام: " . $e->getMessage());
+                $errors[] = 'خطا در ذخیره تنظیمات راه پیام';
+            }
+        }
+
+
         if ($action === 'backup_database') {
             try {
                 $backup_file = 'backup_' . date('Y-m-d_H-i-s') . '.sql';
@@ -318,7 +355,138 @@ include __DIR__ . '/../private/header.php';
                 </form>
             </div>
         </div>
-        
+                <!-- تنظیمات راه پیام (پیامک) -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-sms me-2 text-primary"></i>
+                    تنظیمات راه پیام (سیستم پیامکی)
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <input type="hidden" name="action" value="msgway_settings">
+                    <input type="hidden" name="csrf_token" value="<?php echo $csrf_token; ?>">
+
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="msgway_enabled" name="msgway_enabled"
+                                   <?php echo ($current_settings['msgway_enabled'] ?? '0') == '1' ? 'checked' : ''; ?>>
+                            <label class="form-check-label" for="msgway_enabled">
+                                فعال‌سازی سیستم پیامکی راه پیام
+                            </label>
+                        </div>
+                        <small class="text-muted">با فعال کردن این گزینه، سیستم پیامکی در کل سامانه فعال می‌شود</small>
+                    </div>
+                                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="msgway_api_key" class="form-label">
+                                کلید API (apiKey) <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control" id="msgway_api_key" name="msgway_api_key"
+                                   value="<?php echo htmlspecialchars($current_settings['msgway_api_key'] ?? ''); ?>"
+                                   placeholder="کلید API از پنل راه پیام">
+                            <small class="text-muted">این کلید را از پنل کاربری راه پیام دریافت کنید</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="msgway_line_number" class="form-label">
+                                شماره خط ارسال
+                            </label>
+                            <input type="text" class="form-control" id="msgway_line_number" name="msgway_line_number"
+                                   value="<?php echo htmlspecialchars($current_settings['msgway_line_number'] ?? ''); ?>"
+                                   placeholder="مثال: 30001234567890">
+                            <small class="text-muted">شماره خطی که پیامک‌ها از آن ارسال می‌شود</small>
+                        </div>
+                    </div>
+                                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label for="msgway_otp_template_id" class="form-label">
+                                کد پترن OTP <span class="text-danger">*</span>
+                            </label>
+                            <input type="number" class="form-control" id="msgway_otp_template_id" name="msgway_otp_template_id"
+                                   value="<?php echo htmlspecialchars($current_settings['msgway_otp_template_id'] ?? ''); ?>"
+                                   placeholder="مثال: 123456">
+                            <small class="text-muted">شناسه الگوی OTP در پنل راه پیام</small>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="msgway_otp_length" class="form-label">
+                                طول کد تایید (OTP)
+                            </label>
+                            <select class="form-select" id="msgway_otp_length" name="msgway_otp_length">
+                                <option value="4" <?php echo ($current_settings['msgway_otp_length'] ?? '6') == '4' ? 'selected' : ''; ?>>4 رقم</option>
+                                <option value="5" <?php echo ($current_settings['msgway_otp_length'] ?? '6') == '5' ? 'selected' : ''; ?>>5 رقم</option>
+                                <option value="6" <?php echo ($current_settings['msgway_otp_length'] ?? '6') == '6' ? 'selected' : ''; ?>>6 رقم</option>
+                                <option value="8" <?php echo ($current_settings['msgway_otp_length'] ?? '6') == '8' ? 'selected' : ''; ?>>8 رقم</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="msgway_otp_expire_time" class="form-label">
+                                زمان انقضای کد (ثانیه)
+                            </label>
+                            <input type="number" class="form-control" id="msgway_otp_expire_time" name="msgway_otp_expire_time"
+                                   value="<?php echo htmlspecialchars($current_settings['msgway_otp_expire_time'] ?? '120'); ?>"
+                                   min="60" max="600">
+                            <small class="text-muted">معمولاً 120 ثانیه (2 دقیقه)</small>
+                        </div>
+                    </div>
+                                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="msgway_send_method" class="form-label">
+                                روش ارسال پیش‌فرض
+                            </label>
+                            <select class="form-select" id="msgway_send_method" name="msgway_send_method">
+                                <option value="sms" <?php echo ($current_settings['msgway_send_method'] ?? 'sms') == 'sms' ? 'selected' : ''; ?>>پیامک (SMS)</option>
+                                <option value="ivr" <?php echo ($current_settings['msgway_send_method'] ?? 'sms') == 'ivr' ? 'selected' : ''; ?>>تماس صوتی (IVR)</option>
+                                <option value="messenger" <?php echo ($current_settings['msgway_send_method'] ?? 'sms') == 'messenger' ? 'selected' : ''; ?>>پیام‌رسان داخلی</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="msgway_resend_delay" class="form-label">
+                                تاخیر ارسال مجدد (ثانیه)
+                            </label>
+                            <input type="number" class="form-control" id="msgway_resend_delay" name="msgway_resend_delay"
+                                   value="<?php echo htmlspecialchars($current_settings['msgway_resend_delay'] ?? '60'); ?>"
+                                   min="30" max="300">
+                            <small class="text-muted">حداقل فاصله بین دو ارسال متوالی</small>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="msgway_mobile_format" class="form-label">
+                            فرمت شماره موبایل ورودی
+                        </label>
+                        <select class="form-select" id="msgway_mobile_format" name="msgway_mobile_format">
+                            <option value="09" <?php echo ($current_settings['msgway_mobile_format'] ?? '09') == '09' ? 'selected' : ''; ?>>09xxxxxxxxx (فرمت ایرانی)</option>
+                            <option value="+98" <?php echo ($current_settings['msgway_mobile_format'] ?? '09') == '+98' ? 'selected' : ''; ?>>+989xxxxxxxxx (فرمت بین‌المللی)</option>
+                            <option value="98" <?php echo ($current_settings['msgway_mobile_format'] ?? '09') == '98' ? 'selected' : ''; ?>>989xxxxxxxxx (بدون +)</option>
+                        </select>
+                        <small class="text-muted">نحوه قبول و نمایش شماره‌های موبایل در سیستم</small>
+                    </div>
+                                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>راهنما:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>برای دریافت API Key به <a href="https://msgway.com" target="_blank">پنل راه پیام</a> مراجعه کنید</li>
+                            <li>الگوهای پیامکی باید از قبل در پنل راه پیام ثبت و تایید شده باشند</li>
+                            <li>برای تست سرویس، ابتدا از بخش "الگوهای پیامک" یک الگوی تست ایجاد کنید</li>
+                            <li>مستندات کامل: <a href="https://msgway.com/doc" target="_blank">msgway.com/doc</a></li>
+                        </ul>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-2"></i>
+                        ذخیره تنظیمات راه پیام
+                    </button>
+                    
+                    <a href="sms/templates.php" class="btn btn-secondary">
+                        <i class="fas fa-file-alt me-2"></i>
+                        مدیریت الگوهای پیامک
+                    </a>
+                </form>
+            </div>
+        </div>
+
+
         <!-- تنظیمات ایمیل -->
         <div class="card mt-4">
             <div class="card-header">
